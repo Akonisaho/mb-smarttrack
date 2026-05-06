@@ -83,13 +83,19 @@ export async function fetchMatters(userId) {
 }
 
 export async function createMatter({ id, name, client, description, userId }) {
+  const matterId = id.trim().toUpperCase();
   // Check duplicate
-  const { data: existing } = await supabase.from('matters').select('id').eq('id', id).single();
-  if (existing) return { error: { message: `Matter ID "${id}" already exists.` } };
-  const { data, error } = await supabase.from('matters').insert({
-    id: id.toUpperCase(), name, client, description: description || '', user_id: userId
-  }).select().single();
-  return { data, error };
+  const { data: existing } = await supabase.from('matters').select('id').eq('id', matterId);
+  if (existing && existing.length > 0) return { error: { message: `Matter ID "${matterId}" already exists.` } };
+  const { data, error } = await supabase.from('matters').insert([{
+    id: matterId,
+    name: name.trim(),
+    client: client.trim(),
+    description: (description || '').trim(),
+    user_id: userId
+  }]).select();
+  if (error) console.error('createMatter error:', error.message);
+  return { data: data?.[0], error };
 }
 
 export async function deleteMatter(id) {
@@ -179,26 +185,44 @@ export async function fetchAllProfiles() {
 
 // ── Search ───────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
-  const term = `%${query}%`;
+  if (!query || !userId) return { activities: [], matters: [], invoices: [] };
+  const q = query.toLowerCase().trim();
+
+  // Fetch all user data then filter client-side for reliable fuzzy matching
   const [actsRes, mattersRes, invoicesRes] = await Promise.all([
     supabase.from('activities').select('*').eq('user_id', userId)
-      .or(`window_title.ilike.${term},app_display_name.ilike.${term},matter.ilike.${term}`)
-      .order('start_time', { ascending: false }).limit(40),
+      .order('start_time', { ascending: false }).limit(500),
     supabase.from('matters').select('*').eq('user_id', userId)
-      .or(`name.ilike.${term},client.ilike.${term},id.ilike.${term}`)
       .order('created_at', { ascending: false }),
     supabase.from('invoices').select('*').eq('user_id', userId)
-      .or(`client.ilike.${term},matter_name.ilike.${term},id.ilike.${term}`)
-      .order('created_at', { ascending: false }).limit(20),
+      .order('created_at', { ascending: false }).limit(100),
   ]);
 
-  if(actsRes.error)    console.error('search acts error:', actsRes.error.message);
-  if(mattersRes.error) console.error('search matters error:', mattersRes.error.message);
-  if(invoicesRes.error)console.error('search invoices error:', invoicesRes.error.message);
-
-  return {
-    activities: actsRes.data    || [],
-    matters:    mattersRes.data || [],
-    invoices:   invoicesRes.data|| [],
+  // Client-side filter with fuzzy matching (tolerates typos)
+  const fuzzyMatch = (str) => {
+    if (!str) return false;
+    const s = str.toLowerCase();
+    // Exact contains
+    if (s.includes(q)) return true;
+    // Fuzzy: check if enough characters match in order
+    let qi = 0;
+    for (let i = 0; i < s.length && qi < q.length; i++) {
+      if (s[i] === q[qi]) qi++;
+    }
+    return qi === q.length && q.length >= 3;
   };
+
+  const activities = (actsRes.data || []).filter(a =>
+    fuzzyMatch(a.window_title) || fuzzyMatch(a.app_display_name) || fuzzyMatch(a.matter)
+  ).slice(0, 40);
+
+  const matters = (mattersRes.data || []).filter(m =>
+    fuzzyMatch(m.name) || fuzzyMatch(m.client) || fuzzyMatch(m.id) || fuzzyMatch(m.description)
+  );
+
+  const invoices = (invoicesRes.data || []).filter(i =>
+    fuzzyMatch(i.client) || fuzzyMatch(i.matter_name) || fuzzyMatch(i.id) || fuzzyMatch(i.attorney)
+  );
+
+  return { activities, matters, invoices };
 }
