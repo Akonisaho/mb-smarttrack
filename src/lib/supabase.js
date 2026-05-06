@@ -191,9 +191,14 @@ export async function searchAll(query, userId) {
       .or(`client.ilike.${term},matter_name.ilike.${term},id.ilike.${term}`)
       .order('created_at', { ascending: false }).limit(20),
   ]);
+
+  if(actsRes.error)    console.error('search acts error:', actsRes.error.message);
+  if(mattersRes.error) console.error('search matters error:', mattersRes.error.message);
+  if(invoicesRes.error)console.error('search invoices error:', invoicesRes.error.message);
+
   return {
-    activities: actsRes.data || [],
+    activities: actsRes.data    || [],
     matters:    mattersRes.data || [],
-    invoices:   invoicesRes.data || [],
+    invoices:   invoicesRes.data|| [],
   };
 }
