@@ -392,16 +392,16 @@ export default function App() {
     setMatterSaving(true);
     const res = await createMatter({...matterForm, userId:user.id});
     if(res.error){ alert(res.error.message); setMatterSaving(false); return; }
-    // Auto-link existing activities
-    const words = [...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)].filter(w=>w.length>2);
-    const toLink = allActs.filter(a=>!a.matter && words.some(w=>(a.window_title||'').toLowerCase().includes(w)));
-    for(const a of toLink) await patchActivityMatter(a.id, matterForm.id.toUpperCase());
-    await load();
+    // Close modal immediately — auto-link in background
+    const savedId = matterForm.id.toUpperCase();
     setMatterSaving(false); setShowMatterForm(false);
     setMatterForm({id:'',name:'',client:'',description:''});
-    const linked = toLink.length;
-    setMatterMsg(`Matter ${res.data?.id||matterForm.id} created${linked>0?` — ${linked} activit${linked===1?'y':'ies'} auto-linked`:''}.`);
-    setTimeout(()=>setMatterMsg(''),5000);
+    setMatterMsg(`Matter ${savedId} created successfully.`);
+    setTimeout(()=>setMatterMsg(''),4000);
+    // Auto-link activities in background without blocking UI
+    const words = [...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)].filter(w=>w.length>2);
+    const toLink = allActs.filter(a=>!a.matter && words.some(w=>(a.window_title||'').toLowerCase().includes(w)));
+    Promise.all(toLink.map(a=>patchActivityMatter(a.id, savedId))).then(()=>load());
   }
 
   async function deleteMatter(id){
