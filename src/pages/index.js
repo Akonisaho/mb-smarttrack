@@ -243,7 +243,7 @@ export default function App() {
     setSearching(true);
     // Search via Supabase
     const res = await searchAll(q.trim(), user?.id);
-    if (!res) { setSearching(false); return; }
+    if (!res) { setSearchResults({ activities:[], matters:[], invoices:[], query:q }); setSearching(false); return; }
 
     // Client-side fuzzy on top with Fuse.js — handles typos like "takalni"
     const fuseActs = new Fuse(res.activities, {
