@@ -1,0 +1,6 @@
+{
+  "name": "mb-smarttrack",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next"
+}

@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --mb-black: #0A0A0A;
+  --mb-dark: #111111;
+  --mb-card: #1A1A1A;
+  --mb-border: #2A2A2A;
+  --mb-green: #6CC04A;
+  --mb-green-dark: #4A9432;
+  --mb-green-glow: rgba(108, 192, 74, 0.15);
+  --mb-white: #F5F5F5;
+  --mb-gray: #888888;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background: var(--mb-black);
+  color: var(--mb-white);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--mb-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mb-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mb-green);
+}
+
+/* Pulse animation for live indicator */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(108, 192, 74, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(108, 192, 74, 0); }
+}
+
+.pulse-live {
+  animation: pulse-green 2s infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Green glow */
+.glow-green {
+  box-shadow: 0 0 20px var(--mb-green-glow);
+}
+
+/* MB Logo mark */
+.mb-logo-mark {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+/* Table styling */
+.activity-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mb-gray);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--mb-border);
+}
+
+.activity-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(42, 42, 42, 0.5);
+  font-size: 0.85rem;
+}
+
+.activity-table tr:hover td {
+  background: rgba(108, 192, 74, 0.03);
+}
+
+/* Stat card hover */
+.stat-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: rgba(108, 192, 74, 0.3);
+  box-shadow: 0 0 20px rgba(108, 192, 74, 0.05);
+}
