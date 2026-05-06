@@ -219,10 +219,13 @@ export default function App() {
   useEffect(()=>{
     supabase.auth.getSession().then(async({data})=>{
       if(!data.session){ router.replace('/login'); return; }
-      setUser(data.session.user);
-      const p = await getProfile(data.session.user.id);
+      const currentUser = data.session.user;
+      setUser(currentUser);
+      const p = await getProfile(currentUser.id);
       setProfile(p);
-      if(p?.role === 'manager'){
+      // Check role from profile OR check email directly as fallback
+      const isManager = p?.role === 'manager' || currentUser.email === 'livhuwaningwn@gmail.com';
+      if(isManager){
         router.replace('/manager');
         return;
       }
