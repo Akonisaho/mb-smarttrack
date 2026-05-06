@@ -222,9 +222,11 @@ export default function App() {
       setUser(data.session.user);
       const p = await getProfile(data.session.user.id);
       setProfile(p);
+      if(p?.role === 'manager'){
+        router.replace('/manager');
+        return;
+      }
       setAuthLoading(false);
-      // Redirect managers to manager dashboard
-      if(p?.role === 'manager') router.replace('/manager');
     });
   },[]);
 
