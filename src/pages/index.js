@@ -87,8 +87,8 @@ function downloadPDF(inv, acts) {
     <div style="text-align:right;min-width:240px">
       <table style="width:100%;border-collapse:collapse;margin-bottom:0">
         <tr><td style="padding:4px 8px;font-size:12px;color:#888;border:none;text-align:left">Subtotal (excl. VAT)</td><td style="padding:4px 8px;font-size:12px;color:#555;border:none;text-align:right;font-family:monospace">R${tAmt.toLocaleString()}</td></tr>
-        <tr><td style="padding:4px 8px;font-size:12px;color:#888;border:none;text-align:left">VAT @ 15%</td><td style="padding:4px 8px;font-size:12px;color:#555;border:none;text-align:right;font-family:monospace">R${(tAmt*0.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
-        <tr style="border-top:2px solid #ddd"><td style="padding:6px 8px;font-size:13px;font-weight:700;color:#111;border:none;text-align:left">Total Due (incl. VAT)</td><td style="padding:6px 8px;font-size:22px;font-weight:900;color:#111;border:none;text-align:right">R${(tAmt*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+        <tr><td style="padding:4px 8px;font-size:12px;color:#888;border:none;text-align:left">VAT @ 15%</td><td style="padding:4px 8px;font-size:12px;color:#555;border:none;text-align:right;font-family:monospace">R${(tAmt*0.15).toFixed(2)}</td></tr>
+        <tr style="border-top:2px solid #ddd"><td style="padding:6px 8px;font-size:13px;font-weight:700;color:#111;border:none;text-align:left">Total Due (incl. VAT)</td><td style="padding:6px 8px;font-size:22px;font-weight:900;color:#111;border:none;text-align:right">R${(tAmt*1.15).toFixed(2)}</td></tr>
       </table>
     </div>
   </div>
@@ -558,8 +558,8 @@ export default function App() {
           <div><div style={{fontSize:12,color:'#555'}}><strong>{tU} units</strong> x R{rate} per unit</div><div style={{fontSize:10,color:'#bbb',marginTop:3}}>1 billing unit = 6 minutes (standard SA legal billing)</div></div>
           <div style={{textAlign:'right',minWidth:220}}>
             <div style={{display:'flex',justifyContent:'space-between',gap:24,fontSize:12,color:'#888',marginBottom:3}}><span>Subtotal (excl. VAT)</span><span style={{fontFamily:'monospace',color:'#555'}}>R{tAmt.toLocaleString()}</span></div>
-            <div style={{display:'flex',justifyContent:'space-between',gap:24,fontSize:12,color:'#888',marginBottom:8,paddingBottom:8,borderBottom:'1px solid #ddd'}}><span>VAT @ 15%</span><span style={{fontFamily:'monospace',color:'#555'}}>R{(tAmt*0.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
-            <div style={{display:'flex',justifyContent:'space-between',gap:24,alignItems:'baseline'}}><span style={{fontSize:12,fontWeight:600,color:'#111'}}>Total Due (incl. VAT)</span><span style={{fontSize:22,fontWeight:900,color:'#111'}}>R{(tAmt*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+            <div style={{display:'flex',justifyContent:'space-between',gap:24,fontSize:12,color:'#888',marginBottom:8,paddingBottom:8,borderBottom:'1px solid #ddd'}}><span>VAT @ 15%</span><span style={{fontFamily:'monospace',color:'#555'}}>R{(tAmt*0.15).toFixed(2)}</span></div>
+            <div style={{display:'flex',justifyContent:'space-between',gap:24,alignItems:'baseline'}}><span style={{fontSize:12,fontWeight:600,color:'#111'}}>Total Due (incl. VAT)</span><span style={{fontSize:22,fontWeight:900,color:'#111'}}>R{(tAmt*1.15).toFixed(2)}</span></div>
           </div>
         </div>
         <div style={{marginTop:14,fontSize:10,color:'#ccc',textAlign:'center',lineHeight:1.8}}>Motsoeneng Bill Attorneys · VAT: 4100000000 · FNB 62000000000 · Branch: 250655<br/>accounts@motsoenengbill.co.za · Computer generated invoice.</div>
@@ -878,7 +878,7 @@ export default function App() {
                         <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0'}}>{inv.id}</div>
                         <div style={{fontSize:11,color:'#666'}}>{inv.client} · {inv.matter_name} · {inv.period_label}</div>
                       </div>
-                      <div style={{fontSize:14,fontWeight:700,color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</div>
                     </div>
                   ))}
                 </div>
@@ -1203,7 +1203,7 @@ export default function App() {
                       <div style={{display:'flex',alignItems:'center',gap:12}}>
                         <div style={{textAlign:'right'}}>
                           {/* Recalculate from units × rate, show VAT inclusive */}
-                          <div style={{fontSize:22,fontWeight:800,color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                          <div style={{fontSize:22,fontWeight:800,color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</div>
                           <div style={{fontSize:10,color:'#444',marginTop:2}}>{inv.total_units} units · incl. VAT 15%</div>
                         </div>
                         <button style={{...C.btn('g'),fontSize:11,padding:'5px 12px'}} onClick={e=>{e.stopPropagation();downloadPDF(inv,invActs);}}>⬇ PDF</button>
