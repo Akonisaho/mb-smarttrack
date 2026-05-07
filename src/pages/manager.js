@@ -252,7 +252,7 @@ export default function Manager() {
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Billing Leaderboard — All Time</div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>{['#','Attorney','Total Time','Billable','Utilisation','All Units','Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['#','Attorney','Total Time','Billable','All Units','Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {!byAtty.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No attorney data yet.</td></tr>}
                   {byAtty.map((a,i)=>{
@@ -263,14 +263,7 @@ export default function Manager() {
                         <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>today: {toHm(a.today_sec)}</div></td>
                         <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td>
                         <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A'}}>{toHm(a.bill_sec)}</td>
-                        <td style={C.td}>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <div style={{background:'#1A1A1A',borderRadius:3,height:6,width:70,flexShrink:0}}>
-                              <div style={{background:'#6CC04A',borderRadius:3,height:6,width:`${barW}%`}}/>
-                            </div>
-                            <span style={{fontSize:11,color:'#888'}}>{barW}%</span>
-                          </div>
-                        </td>
+
                         <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',fontWeight:700}}>{a.all_units||'—'}</td>
                         <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A'}}>{a.billed_units||'—'}<div style={{fontSize:9,color:'#444'}}>R{(a.billed_units*rate).toLocaleString()}</div></td>
                         <td style={{...C.td,fontFamily:'monospace',color:'#D97706'}}>{a.unbilled_units>0?a.unbilled_units:'—'}{a.unbilled_units>0&&<div style={{fontSize:9,color:'#444'}}>R{(a.unbilled_units*rate).toLocaleString()}</div>}</td>
@@ -346,14 +339,13 @@ export default function Manager() {
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance — All Time</div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>{['Attorney','Total Time','Billable','Utilisation','Units Earned','Units Billed','Units Unbilled','Est. Unbilled Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Attorney','Total Time','Billable','Units Earned','Units Billed','Units Unbilled','Est. Unbilled Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {byAtty.map(a=>(
                     <tr key={a.id}>
                       <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A'}}>{toHm(a.bill_sec)}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#888'}}>{pct(a.bill_sec,a.total_sec)}%</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',fontWeight:700}}>{a.all_units||'—'}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A'}}>{a.billed_units||'—'}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#D97706':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td>
