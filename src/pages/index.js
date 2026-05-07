@@ -196,7 +196,7 @@ export default function App() {
   },[]);
 
   const load=useCallback(async()=>{
-    if(!user) return;
+    if(!user?.id) return;
     const uid = user.id;
     const [liveRes, allRes, invRes, matRes] = await Promise.all([
       fetchActivities({ date: selDate, userId: uid }),
@@ -209,14 +209,12 @@ export default function App() {
     if(allRes.activities)  setAllActs(allRes.activities);
     if(invRes.invoices)    setInvoices(invRes.invoices);
     if(matRes.matters)     setMatters(matRes.matters);
-    // Build dates from allActs
     const dmap = {};
     (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
     setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[selDate, user?.id]);
 
-  // Auth check on mount
+  // Auth check — runs once on mount
   useEffect(()=>{
     supabase.auth.getSession().then(async({data})=>{
       if(!data.session){ router.replace('/login'); return; }
@@ -224,21 +222,21 @@ export default function App() {
       setUser(currentUser);
       const p = await getProfile(currentUser.id);
       setProfile(p);
-      // Check role from profile OR check email directly as fallback
-      const isManager = p?.role === 'manager' || currentUser.email === 'livhuwaningwn@gmail.com';
-      if(isManager){
-        router.replace('/manager');
-        return;
-      }
+      const isManager = p?.role==='manager' || currentUser.email==='livhuwaningwn@gmail.com';
+      if(isManager){ router.replace('/manager'); return; }
       setAuthLoading(false);
     });
-  },[]);
+  },[]); // empty deps — runs once only
 
+  // Load data — only when authLoading changes or selDate/userId changes
   useEffect(()=>{
-    if(!authLoading && user){ load(); const t=setInterval(load,15000); return()=>clearInterval(t); }
-  },[load, authLoading, user]);
+    if(authLoading || !user?.id) return;
+    load();
+    const t = setInterval(load, 15000);
+    return()=>clearInterval(t);
+  },[authLoading, selDate, user?.id]); // stable primitives only — no load function reference
 
-  // ── Fuzzy search across all data ────────────────────────────────────
+    // ── Fuzzy search across all data ────────────────────────────────────
   const doSearch = useCallback(async (q) => {
     if (!q || q.trim().length < 1) { setSearchResults(null); return; }
     setSearching(true);
