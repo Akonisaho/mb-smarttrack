@@ -454,7 +454,7 @@ export default function Manager() {
                     <tr style={{background:'rgba(108,192,74,0.05)'}}>
                       <td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td>
                       <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{billedRevenue.toLocaleString()}</td>
-                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{(Math.round(billedRevenue*1.15).toFixed(2)}</td>
+                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{(billedRevenue*1.15).toFixed(2)}</td>
                     </tr>
                   )}
                 </tbody>
