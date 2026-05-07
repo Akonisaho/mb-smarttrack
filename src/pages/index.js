@@ -385,7 +385,7 @@ export default function App() {
   }
 
   // Create matter
-  async function createMatter(){
+  async function handleCreateMatter(){
     if(!matterForm.name||!matterForm.client) return;
     setMatterSaving(true);
     const res = await createMatter({...matterForm, userId:user.id});
@@ -1276,7 +1276,7 @@ export default function App() {
             </div>
             <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
               <button style={C.btn()} onClick={()=>setShowMatterForm(false)}>Cancel</button>
-              <button style={C.btn('p')} onClick={createMatter} disabled={matterSaving||!matterForm.id||!matterForm.name||!matterForm.client}>{matterSaving?'Creating...':'Create Matter'}</button>
+              <button style={C.btn('p')} onClick={handleCreateMatter} disabled={matterSaving||!matterForm.id||!matterForm.name||!matterForm.client}>{matterSaving?'Creating...':'Create Matter'}</button>
             </div>
           </div>
         </div>
