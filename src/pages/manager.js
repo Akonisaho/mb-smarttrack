@@ -83,11 +83,15 @@ export default function Manager() {
   const firmAllTimeBill  = allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
 
   // Top matters across firm
-  const topMatters = matters.map(m=>{
-    const mInvs = invoices.filter(i=>i.matter_id===m.id);
-    const totalAmt = mInvs.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
-    return {...m, invoiceCount: mInvs.length, totalAmount: totalAmt};
-  }).sort((a,b)=>b.totalAmount-a.totalAmount).slice(0,10);
+  // Build top matters from invoices (manager sees all invoices)
+  const matterMap = {};
+  invoices.forEach(inv => {
+    const key = inv.matter_id || inv.matter_name || 'Unknown';
+    if (!matterMap[key]) matterMap[key] = { id: key, name: inv.matter_name||key, client: inv.client||'', invoiceCount: 0, totalAmount: 0 };
+    matterMap[key].invoiceCount++;
+    matterMap[key].totalAmount += (inv.total_units||0)*(inv.rate||150);
+  });
+  const topMatters = Object.values(matterMap).sort((a,b)=>b.totalAmount-a.totalAmount).slice(0,10);
 
   const C = {
     page:  {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0'},
@@ -152,7 +156,7 @@ export default function Manager() {
           {/* Firm-wide stat cards */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
             {[
-              {l:'Total Time (All)',    v:toHm(firmAllTimeSec),              s:`${profiles.length} attorneys`,        acc:false},
+              {l:'Total Time (All)',    v:toHm(firmAllTimeSec),              s:`${profiles.length} attorney${profiles.length===1?'':'s'}`,        acc:false},
               {l:'Billable Time (All)', v:toHm(firmAllTimeBill),             s:`${pct(firmAllTimeBill,firmAllTimeSec)}% utilisation`, acc:true},
               {l:'Total Units (All)',   v:firmAllTimeUnits,                   s:'across all attorneys',                acc:false},
               {l:'Est. Revenue (All)',  v:`R${(firmAllTimeUnits*rate).toLocaleString()}`, s:`excl. VAT · @ R${rate}/unit`, acc:false},
@@ -210,8 +214,8 @@ export default function Manager() {
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead><tr>{['Matter ID','Client','Invoices','Total Billed'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {topMatters.map(m=>(
-                      <tr key={m.id}>
+                    {topMatters.map((m,i)=>(
+                      <tr key={i}>
                         <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td>
                         <td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td>
                         <td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td>
