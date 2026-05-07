@@ -33,8 +33,9 @@ export async function fetchActivities({ date, userId } = {}) {
   return { activities: data || [] };
 }
 export async function fetchAllActivities({ userId } = {}) {
+  // Include ALL activities except demo seeds — call logs (manual-call-*) are included
   const { data, error } = await supabase.from('activities').select('*')
-    .neq('agent_id', 'demo').eq('user_id', userId)
+    .not('agent_id', 'eq', 'demo').eq('user_id', userId)
     .order('start_time', { ascending: false }).limit(2000);
   if (error) console.error('fetchAllActivities:', error.message);
   return { activities: data || [] };

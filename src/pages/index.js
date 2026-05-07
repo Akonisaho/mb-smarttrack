@@ -440,7 +440,7 @@ export default function App() {
     setPreview({label,filtered,bill,tU,tAmt:tU*invRate});
   }
 
-  async function saveInvoice(){
+  async function handleSaveInvoice(){
     if(!preview||!invMatter) return;
     const res=await saveInvoice({
       client:invMatter.client, matter_id:invMatter.id, matter_name:invMatter.name,
@@ -1162,7 +1162,7 @@ export default function App() {
                   <div style={{display:'flex',gap:8}}>
                     <button style={C.btn()} onClick={()=>setPreview(null)}>Cancel</button>
                     <button style={C.btn('g')} onClick={()=>downloadPDF({...preview,id:'MB-PREVIEW',client:invMatter?.client,matter_id:invMatter?.id,matter_name:invMatter?.name,attorney:invAtty,rate:invRate,period_label:preview.label},preview.filtered)}>⬇ PDF</button>
-                    <button style={C.btn('p')} onClick={saveInvoice}>Save to Archive</button>
+                    <button style={C.btn('p')} onClick={handleSaveInvoice}>Save to Archive</button>
                   </div>
                 </div>
                 {!preview.bill.length&&(
