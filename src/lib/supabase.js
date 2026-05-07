@@ -90,9 +90,9 @@ export async function fetchInvoices(userId) {
 }
 export async function saveInvoice(invoice, userId) {
   try {
-    const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', userId);
-    const num = (count || 0) + 1;
-    const id  = `MB-${String(num).padStart(4, '0')}-${new Date().getFullYear()}`;
+    // Use timestamp-based ID to avoid duplicate key conflicts
+    const ts  = Date.now().toString().slice(-6);
+    const id  = `MB-${ts}-${new Date().getFullYear()}`;
     // Ensure matter_id is the manually entered ID not auto-generated
     const invoiceData = {
       id,
