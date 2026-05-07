@@ -213,7 +213,8 @@ export default function App() {
     const dmap = {};
     (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
     setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
-  },[selDate, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[selDate, user?.id]);
 
   // Auth check on mount
   useEffect(()=>{
@@ -390,24 +391,29 @@ export default function App() {
   async function createMatter(){
     if(!matterForm.name||!matterForm.client) return;
     setMatterSaving(true);
-    console.log('Creating matter with userId:', user.id, 'form:', matterForm);
     const res = await createMatter({...matterForm, userId:user.id});
-    console.log('createMatter result:', res);
     if(res.error){ 
-      alert('Error creating matter: ' + res.error.message); 
+      alert(res.error.message); 
       setMatterSaving(false); 
       return; 
     }
-    // Close modal immediately — auto-link in background
-    const savedId = matterForm.id.toUpperCase();
-    setMatterSaving(false); setShowMatterForm(false);
-    setMatterForm({id:'',name:'',client:'',description:''});
-    setMatterMsg(`Matter ${savedId} created successfully.`);
-    setTimeout(()=>setMatterMsg(''),4000);
-    // Auto-link activities in background without blocking UI
-    const words = [...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)].filter(w=>w.length>2);
+    const savedId = (res.data?.id || matterForm.id).toUpperCase();
+    // Auto-link matching activities
+    const words = [
+      ...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),
+      ...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)
+    ].filter(w=>w.length>2);
     const toLink = allActs.filter(a=>!a.matter && words.some(w=>(a.window_title||'').toLowerCase().includes(w)));
-    Promise.all(toLink.map(a=>patchActivityMatter(a.id, savedId))).then(()=>load());
+    if(toLink.length > 0){
+      await Promise.all(toLink.map(a=>patchActivityMatter(a.id, savedId)));
+    }
+    // Reset state BEFORE load to prevent loops
+    setMatterSaving(false);
+    setShowMatterForm(false);
+    setMatterForm({id:'',name:'',client:'',description:''});
+    setMatterMsg(`Matter ${savedId} created — ${toLink.length} activit${toLink.length===1?'y':'ies'} linked.`);
+    setTimeout(()=>setMatterMsg(''),4000);
+    load();
   }
 
   async function deleteMatter(id){
