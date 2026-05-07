@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, fetchAllProfiles, fetchManagerSummary, fetchMatters, fetchInvoices, fetchMonthActivities, saveInvoice } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchMatters, fetchInvoices } from '../lib/supabase';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function calcUnits(s){ return Math.max(1,Math.ceil((Number(s)||0)/360)); }
@@ -12,7 +12,8 @@ export default function Manager() {
   const router = useRouter();
   const [profile, setProfile]       = useState(null);
   const [loading, setLoading]       = useState(true);
-  const [selDate, setSelDate]       = useState(new Date().toISOString().split('T')[0]);
+  const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+  const [selDate, setSelDate]       = useState(todayStr);
   const [summary, setSummary]       = useState([]);
   const [profiles, setProfiles]     = useState([]);
   const [matters, setMatters]       = useState([]);
@@ -122,6 +123,7 @@ export default function Manager() {
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
             <button style={C.btn} onClick={()=>router.push('/')}>← Attorney View</button>
             <div style={C.pill}><div style={C.dot}/>{clock}</div>
+            <button style={{...C.btn,color:'#E05252',borderColor:'rgba(220,80,80,0.3)'}} onClick={async()=>{ await signOut(); router.replace('/login'); }}>Sign out</button>
           </div>
         </div>
 
