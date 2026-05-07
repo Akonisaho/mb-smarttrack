@@ -87,11 +87,32 @@ export async function fetchInvoices(userId) {
   return { invoices: data || [] };
 }
 export async function saveInvoice(invoice, userId) {
-  const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', userId);
-  const id = `MB-${String((count || 0) + 1).padStart(4, '0')}-${new Date().getFullYear()}`;
-  const { data, error } = await supabase.from('invoices').insert([{ ...invoice, id, user_id: userId }]).select();
-  if (error) console.error('saveInvoice:', error.message);
-  return { data: data?.[0], error, id };
+  try {
+    const { count } = await supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+    const num = (count || 0) + 1;
+    const id  = `MB-${String(num).padStart(4, '0')}-${new Date().getFullYear()}`;
+    // Ensure matter_id is the manually entered ID not auto-generated
+    const invoiceData = {
+      id,
+      user_id:      userId,
+      client:       invoice.client       || '',
+      matter_id:    invoice.matter_id    || '',  // manually entered e.g. L2025/042
+      matter_name:  invoice.matter_name  || '',
+      attorney:     invoice.attorney     || '',
+      period:       invoice.period       || 'day',
+      period_label: invoice.period_label || '',
+      rate:         invoice.rate         || 150,
+      total_units:  invoice.total_units  || 0,
+      total_amount: invoice.total_amount || 0,
+      activity_ids: invoice.activity_ids || [],
+    };
+    const { data, error } = await supabase.from('invoices').insert([invoiceData]).select();
+    if (error) console.error('saveInvoice error:', error.message);
+    return { data: data?.[0], error, id };
+  } catch(e) {
+    console.error('saveInvoice exception:', e.message);
+    return { data: null, error: { message: e.message } };
+  }
 }
 export async function deleteInvoice(id) {
   const { error } = await supabase.from('invoices').delete().eq('id', id);
