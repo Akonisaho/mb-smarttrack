@@ -390,8 +390,14 @@ export default function App() {
   async function createMatter(){
     if(!matterForm.name||!matterForm.client) return;
     setMatterSaving(true);
+    console.log('Creating matter with userId:', user.id, 'form:', matterForm);
     const res = await createMatter({...matterForm, userId:user.id});
-    if(res.error){ alert(res.error.message); setMatterSaving(false); return; }
+    console.log('createMatter result:', res);
+    if(res.error){ 
+      alert('Error creating matter: ' + res.error.message); 
+      setMatterSaving(false); 
+      return; 
+    }
     // Close modal immediately — auto-link in background
     const savedId = matterForm.id.toUpperCase();
     setMatterSaving(false); setShowMatterForm(false);
