@@ -53,8 +53,9 @@ export async function patchActivityMatter(id, matter) {
 
 // ── Matters ───────────────────────────────────────────────────────────
 export async function fetchMatters(userId) {
-  const { data, error } = await supabase.from('matters').select('*')
-    .eq('user_id', userId).order('created_at', { ascending: false });
+  let q = supabase.from('matters').select('*').order('created_at', { ascending: false });
+  if (userId) q = q.eq('user_id', userId); // null = manager sees all
+  const { data, error } = await q;
   if (error) console.error('fetchMatters:', error.message);
   return { matters: data || [] };
 }
@@ -81,8 +82,9 @@ export async function deleteMatter(id) {
 
 // ── Invoices ──────────────────────────────────────────────────────────
 export async function fetchInvoices(userId) {
-  const { data, error } = await supabase.from('invoices').select('*')
-    .eq('user_id', userId).order('created_at', { ascending: false });
+  let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
+  if (userId) q = q.eq('user_id', userId); // null = manager sees all
+  const { data, error } = await q;
   if (error) console.error('fetchInvoices:', error.message);
   return { invoices: data || [] };
 }
@@ -150,11 +152,20 @@ export async function fetchMonthActivities(month, userId) {
 
 // ── Manager ───────────────────────────────────────────────────────────
 export async function fetchManagerSummary(date) {
-  const { data } = await supabase.from('manager_summary').select('*').eq('date', date);
-  return { summary: data || [] };
+  // Get summary for selected date AND all-time totals
+  const { data } = await supabase.from('manager_summary').select('*')
+    .eq('date', date);
+  // Also get all-time billing units per attorney
+  const { data: allTime } = await supabase.from('activities').select(
+    'user_id, billing_units, is_billable, duration_seconds'
+  ).neq('agent_id', 'demo');
+  return { summary: data || [], allTime: allTime || [] };
 }
 export async function fetchAllProfiles() {
-  const { data } = await supabase.from('profiles').select('*').eq('role', 'attorney').order('full_name');
+  // Get all attorneys including those with no activity today
+  const { data, error } = await supabase.from('profiles').select('*')
+    .eq('role', 'attorney').order('full_name');
+  if (error) console.error('fetchAllProfiles:', error.message);
   return { profiles: data || [] };
 }
 

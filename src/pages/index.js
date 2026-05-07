@@ -1197,7 +1197,7 @@ export default function App() {
                           <span style={{fontSize:12,fontWeight:700,color:'#D0D0D0'}}>{inv.id}</span>
                           <span style={{fontSize:9,color:'#6CC04A',border:'1px solid rgba(108,192,74,0.3)',background:'rgba(108,192,74,0.08)',padding:'1px 8px',borderRadius:20}}>Saved</span>
                         </div>
-                        <div style={{fontSize:11,color:'#555'}}>{inv.client} · {inv.matter_name||inv.matter}</div>
+                        <div style={{fontSize:11,color:'#555'}}>{inv.client} · <span style={{color:'#A78BFA'}}>{inv.matter_id||inv.matter_name||inv.matter}</span></div>
                         <div style={{fontSize:10,color:'#333',marginTop:2}}>{inv.period_label} · {inv.total_units} units · {new Date(inv.created_at).toLocaleDateString('en-ZA')}</div>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -1288,7 +1288,7 @@ export default function App() {
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 20px'}} onClick={()=>setViewInv(null)}>
           <div style={{background:'#111',border:'1px solid #252525',borderRadius:12,padding:24,maxWidth:780,width:'100%'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}>
-              <div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · {viewInv.matter_name||viewInv.matter} · {viewInv.period_label}</div></div>
+              <div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · <span style={{color:'#A78BFA'}}>{viewInv.matter_id||viewInv.matter_name}</span> · {viewInv.period_label}</div></div>
               <div style={{display:'flex',gap:8}}>
                 <button style={C.btn('g')} onClick={()=>downloadPDF(viewInv,allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id)))}>⬇ PDF</button>
                 <button style={C.btn('r')} onClick={async()=>{

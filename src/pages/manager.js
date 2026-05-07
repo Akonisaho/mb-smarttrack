@@ -17,6 +17,7 @@ export default function Manager() {
   const [profiles, setProfiles]     = useState([]);
   const [matters, setMatters]       = useState([]);
   const [invoices, setInvoices]     = useState([]);
+  const [allTime, setAllTime]       = useState([]);
   const [selAtty, setSelAtty]       = useState('all');
   const [clock, setClock]           = useState('');
   const [rate, setRate]             = useState(150);
@@ -41,13 +42,14 @@ export default function Manager() {
     const [sumRes, profRes, matRes, invRes] = await Promise.all([
       fetchManagerSummary(selDate),
       fetchAllProfiles(),
-      fetchMatters(),
-      fetchInvoices(),
+      fetchMatters(null),
+      fetchInvoices(null),
     ]);
-    if(sumRes.summary)  setSummary(sumRes.summary);
+    if(sumRes.summary)   setSummary(sumRes.summary);
+    if(sumRes.allTime)   setAllTime(sumRes.allTime);
     if(profRes.profiles) setProfiles(profRes.profiles);
-    if(matRes.matters)  setMatters(matRes.matters);
-    if(invRes.invoices) setInvoices(invRes.invoices);
+    if(matRes.matters)   setMatters(matRes.matters||[]);
+    if(invRes.invoices)  setInvoices(invRes.invoices||[]);
   },[selDate]);
 
   useEffect(()=>{ if(!loading) load(); },[loading, load]);
@@ -59,17 +61,25 @@ export default function Manager() {
   const firmBillUnits   = filtered.reduce((s,a)=>s+(a.billable_units||0),0);
   const firmEstValue    = firmBillUnits * rate;
 
-  // Per-attorney rollup
+  // Per-attorney rollup — today's activity + all-time billing units
   const byAtty = profiles.map(p=>{
-    const rows = filtered.filter(s=>s.user_id===p.id);
+    const rows     = filtered.filter(s=>s.user_id===p.id);
+    const allTimeP = allTime.filter(a=>a.user_id===p.id);
     return {
       ...p,
-      total_sec:   rows.reduce((s,r)=>s+(r.total_seconds||0),0),
-      bill_sec:    rows.reduce((s,r)=>s+(r.billable_seconds||0),0),
-      bill_units:  rows.reduce((s,r)=>s+(r.billable_units||0),0),
-      sessions:    rows.reduce((s,r)=>s+(r.total_sessions||0),0),
+      total_sec:        rows.reduce((s,r)=>s+(r.total_seconds||0),0),
+      bill_sec:         rows.reduce((s,r)=>s+(r.billable_seconds||0),0),
+      bill_units_today: rows.reduce((s,r)=>s+(r.billable_units||0),0),
+      bill_units:       allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),
+      sessions:         rows.reduce((s,r)=>s+(r.total_sessions||0),0),
+      total_sec_alltime:allTimeP.reduce((s,a)=>s+(a.duration_seconds||0),0),
     };
   }).sort((a,b)=>b.bill_units-a.bill_units);
+
+  // Firm-wide all-time totals
+  const firmAllTimeUnits = allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
+  const firmAllTimeSec   = allTime.reduce((s,a)=>s+(a.duration_seconds||0),0);
+  const firmAllTimeBill  = allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
 
   // Top matters across firm
   const topMatters = matters.map(m=>{
@@ -140,10 +150,10 @@ export default function Manager() {
           {/* Firm-wide stat cards */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
             {[
-              {l:'Total Time',     v:toHm(firmTotalSec),            s:`${profiles.length} attorneys`,    acc:false},
-              {l:'Billable Time',  v:toHm(firmBillSec),             s:`${pct(firmBillSec,firmTotalSec)}% utilisation`, acc:true},
-              {l:'Billing Units',  v:firmBillUnits,                  s:'across firm today',               acc:false},
-              {l:'Est. Revenue',   v:`R${firmEstValue.toLocaleString()}`, s:`excl. VAT · @ R${rate}/unit`, acc:false},
+              {l:'Total Time (All)',    v:toHm(firmAllTimeSec),              s:`${profiles.length} attorneys`,        acc:false},
+              {l:'Billable Time (All)', v:toHm(firmAllTimeBill),             s:`${pct(firmAllTimeBill,firmAllTimeSec)}% utilisation`, acc:true},
+              {l:'Total Units (All)',   v:firmAllTimeUnits,                   s:'across all attorneys',                acc:false},
+              {l:'Est. Revenue (All)',  v:`R${(firmAllTimeUnits*rate).toLocaleString()}`, s:`excl. VAT · @ R${rate}/unit`, acc:false},
             ].map(({l,v,s,acc})=>(
               <div key={l} style={C.stat(acc)}>
                 <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
@@ -179,7 +189,7 @@ export default function Manager() {
                           <span style={{fontSize:11,color:'#888',fontFamily:'monospace'}}>{barW}%</span>
                         </div>
                       </td>
-                      <td style={{...C.td,fontFamily:'monospace',color:a.bill_units>0?'#6CC04A':'#444',fontWeight:600}}>{a.bill_units||'—'}</td>
+                      <td style={{...C.td,fontFamily:'monospace',color:a.bill_units>0?'#6CC04A':'#444',fontWeight:600}}>{a.bill_units||'—'}<div style={{fontSize:9,color:'#444'}}>today: {a.bill_units_today||0}</div></td>
                       <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:val>0?'#6CC04A':'#444'}}>{val>0?`R${val.toLocaleString()}`:'—'}</td>
                     </tr>
                   );
