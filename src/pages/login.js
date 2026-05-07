@@ -55,9 +55,7 @@ export default function Login() {
         <div style={S.box}>
           {/* Logo */}
           <div style={{textAlign:'center', marginBottom:28}}>
-            <div style={{fontWeight:900, fontSize:32, letterSpacing:'-0.05em', marginBottom:6}}>
-              M<span style={{color:'#6CC04A'}}>B</span>
-            </div>
+            <img src="/logo.png" alt="MB" style={{width:80,height:80,objectFit:'contain',marginBottom:10}}/>
             <div style={{fontSize:16, fontWeight:600, color:'#D0D0D0', marginBottom:4}}>SmartTrack</div>
             <div style={{fontSize:11, color:'#444', textTransform:'uppercase', letterSpacing:'.08em'}}>Motsoeneng Bill Attorneys</div>
           </div>
