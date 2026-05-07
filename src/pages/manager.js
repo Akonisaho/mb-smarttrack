@@ -238,7 +238,7 @@ export default function Manager() {
               </div>
               <div style={C.stat(true,false)}>
                 <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>Billed Revenue</div>
-                <div style={{fontSize:24,fontWeight:800,color:'#6CC04A',marginBottom:4}}>R{(billedRevenue*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                <div style={{fontSize:24,fontWeight:800,color:'#6CC04A',marginBottom:4}}>R{(billedRevenue*1.15).toFixed(2)}</div>
                 <div style={{fontSize:10,color:'#444'}}>{billedUnits} units invoiced · incl. VAT 15%</div>
               </div>
               <div style={C.stat(false,true)}>
@@ -306,7 +306,7 @@ export default function Manager() {
                           <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
                           <td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td>
                           <td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td>
-                          <td style={{...C.td,fontFamily:"monospace",fontWeight:700,color:"#6CC04A"}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                          <td style={{...C.td,fontFamily:"monospace",fontWeight:700,color:"#6CC04A"}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -326,7 +326,7 @@ export default function Manager() {
               {[
                 {l:'Total Attorneys',v:profiles.length,s:'in the firm'},
                 {l:'Total Units (All Time)',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},
-                {l:"Total Billed",v:`R${(billedRevenue*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`,s:`${billedUnits} units · incl. VAT`},
+                {l:"Total Billed",v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},
                 {l:'Total Unbilled',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units pending`},
               ].map(({l,v,s})=>(
                 <div key={l} style={C.stat(false,false)}>
@@ -447,14 +447,14 @@ export default function Manager() {
                       <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',fontWeight:600}}>{inv.total_units}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td>
                       <td style={{...C.td,fontFamily:'monospace',color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td>
-                      <td style={{...C.td,fontFamily:"monospace",fontWeight:700,color:"#6CC04A"}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                      <td style={{...C.td,fontFamily:"monospace",fontWeight:700,color:"#6CC04A"}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td>
                     </tr>
                   ))}
                   {filtInvoices.length>0&&(
                     <tr style={{background:'rgba(108,192,74,0.05)'}}>
                       <td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td>
                       <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{billedRevenue.toLocaleString()}</td>
-                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{(Math.round(billedRevenue*1.15).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#6CC04A'}}>R{(Math.round(billedRevenue*1.15).toFixed(2)}</td>
                     </tr>
                   )}
                 </tbody>
