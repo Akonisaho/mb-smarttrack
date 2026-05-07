@@ -281,7 +281,7 @@ export default function App() {
     if (!searchQuery.trim()) { setSearchResults(null); return; }
     const t = setTimeout(() => doSearch(searchQuery), 300);
     return () => clearTimeout(t);
-  }, [searchQuery, doSearch]);
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load history for selected year ───────────────────────────────────
   const loadHistory = useCallback(async (year) => {
@@ -291,11 +291,11 @@ export default function App() {
     const yrs = [...new Set(allActs.map(a=>a.date?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a);
     if(!yrs.includes(String(year))) yrs.unshift(String(year));
     setHistYears(yrs);
-  }, [user, allActs]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (tab === 'history') loadHistory(histYear);
-  }, [tab, histYear, loadHistory]);
+  }, [tab, histYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMonth = useCallback(async (month) => {
     setSelMonth(month);
@@ -307,7 +307,7 @@ export default function App() {
       const bU    = acts.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
       setMonthData({ activities:acts, totals:{ sessions:acts.length, total_seconds:tSec, billable_seconds:bSec, billable_units:bU }});
     }
-  }, [user]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Reclassify
   async function reclassify(id,cls){
