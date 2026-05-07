@@ -413,7 +413,7 @@ export default function App() {
     load();
   }
 
-  async function deleteMatter(id){
+  async function handleDeleteMatter(id){
     if(!confirm(`Delete matter ${id}? Activities will be unlinked.`)) return;
     await deleteMatter(id);
     load();
@@ -448,7 +448,8 @@ export default function App() {
       total_units:preview.tU, total_amount:preview.tAmt,
       activity_ids:preview.bill.map(a=>a.id)
     }, user.id);
-    if(!res.error){setPreview(null);await load();setTab('archive');}
+    if(res.error){ alert('Error saving invoice: ' + res.error.message); return; }
+    setPreview(null); await load(); setTab('archive');
   }
 
   // Analytics helpers
@@ -1042,7 +1043,7 @@ export default function App() {
                           ))}
                           <div style={{display:'flex',flexDirection:'column',gap:6}}>
                             <button style={{...C.btn('p'),fontSize:11,padding:'5px 12px'}} onClick={()=>{setInvMatterId(m.id);setTab('invoices');}}>Invoice</button>
-                            <button style={{...C.btn('r'),fontSize:11,padding:'5px 12px'}} onClick={()=>deleteMatter(m.id)}>Delete</button>
+                            <button style={{...C.btn('r'),fontSize:11,padding:'5px 12px'}} onClick={()=>handleDeleteMatter(m.id)}>Delete</button>
                           </div>
                         </div>
                       </div>
