@@ -195,119 +195,118 @@ export default function App() {
     return()=>clearInterval(t);
   },[]);
 
-  const load=useCallback(async()=>{
-    if(!user?.id) return;
-    const uid = user.id;
-    const [liveRes, allRes, invRes, matRes] = await Promise.all([
-      fetchActivities({ date: selDate, userId: uid }),
-      fetchAllActivities({ userId: uid }),
-      fetchInvoices(uid),
-      fetchMatters(uid),
-    ]);
-    setOnline(true);
-    if(liveRes.activities) setLiveActs(liveRes.activities.sort((a,b)=>a.start_time-b.start_time));
-    if(allRes.activities)  setAllActs(allRes.activities);
-    if(invRes.invoices)    setInvoices(invRes.invoices);
-    if(matRes.matters)     setMatters(matRes.matters);
-    const dmap = {};
-    (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
-    setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
-  },[selDate, user?.id]);
-
-  // Auth check — runs once on mount
+  // ── Auth — runs once ─────────────────────────────────────────────────
   useEffect(()=>{
     supabase.auth.getSession().then(async({data})=>{
       if(!data.session){ router.replace('/login'); return; }
-      const currentUser = data.session.user;
-      setUser(currentUser);
-      const p = await getProfile(currentUser.id);
+      const u = data.session.user;
+      setUser(u);
+      const p = await getProfile(u.id);
       setProfile(p);
-      const isManager = p?.role==='manager' || currentUser.email==='livhuwaningwn@gmail.com';
-      if(isManager){ router.replace('/manager'); return; }
+      if(p?.role==='manager'||u.email==='livhuwaningwn@gmail.com'){
+        router.replace('/manager'); return;
+      }
       setAuthLoading(false);
     });
-  },[]); // empty deps — runs once only
+  },[]); // runs once only
 
-  // Load data — only when authLoading changes or selDate/userId changes
+  // ── Load all data ─────────────────────────────────────────────────────
+  const userId = user?.id || null;
+
   useEffect(()=>{
-    if(authLoading || !user?.id) return;
-    load();
-    const t = setInterval(load, 15000);
-    return()=>clearInterval(t);
-  },[authLoading, selDate, user?.id]); // stable primitives only — no load function reference
+    if(authLoading || !userId) return;
+    let cancelled = false;
+    const doLoad = async () => {
+      const [liveRes, allRes, invRes, matRes] = await Promise.all([
+        fetchActivities({ date: selDate, userId }),
+        fetchAllActivities({ userId }),
+        fetchInvoices(userId),
+        fetchMatters(userId),
+      ]);
+      if(cancelled) return;
+      setOnline(true);
+      setLiveActs((liveRes.activities||[]).sort((a,b)=>a.start_time-b.start_time));
+      setAllActs(allRes.activities||[]);
+      setInvoices(invRes.invoices||[]);
+      setMatters(matRes.matters||[]);
+      const dmap={};
+      (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
+      setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
+    };
+    doLoad();
+    const t = setInterval(doLoad, 15000);
+    return()=>{ cancelled=true; clearInterval(t); };
+  },[authLoading, userId, selDate]); // stable primitives only
 
-    // ── Fuzzy search across all data ────────────────────────────────────
-  const doSearch = useCallback(async (q) => {
-    if (!q || q.trim().length < 1) { setSearchResults(null); return; }
-    setSearching(true);
-    // Search via Supabase
-    const res = await searchAll(q.trim(), user?.id);
-    if (!res) { setSearchResults({ activities:[], matters:[], invoices:[], query:q }); setSearching(false); return; }
+  // ── Expose load for manual refresh ────────────────────────────────────
+  const load = useCallback(async()=>{
+    if(!userId) return;
+    const [liveRes, allRes, invRes, matRes] = await Promise.all([
+      fetchActivities({ date: selDate, userId }),
+      fetchAllActivities({ userId }),
+      fetchInvoices(userId),
+      fetchMatters(userId),
+    ]);
+    setOnline(true);
+    setLiveActs((liveRes.activities||[]).sort((a,b)=>a.start_time-b.start_time));
+    setAllActs(allRes.activities||[]);
+    setInvoices(invRes.invoices||[]);
+    setMatters(matRes.matters||[]);
+    const dmap={};
+    (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
+    setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
+  },[userId, selDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Client-side fuzzy on top with Fuse.js — handles typos like "takalni"
-    const fuseActs = new Fuse(res.activities, {
-      keys: ['window_title','app_display_name','matter'],
-      threshold: 0.4, includeScore: true
+  // ── Search ────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!searchQuery.trim()){ setSearchResults(null); return; }
+    const t = setTimeout(async()=>{
+      if(!userId) return;
+      setSearching(true);
+      const res = await searchAll(searchQuery.trim(), userId);
+      // Simple fuzzy using Fuse on results
+      const fuseA = new Fuse(res.activities||[], {keys:['window_title','app_display_name','matter'],threshold:0.4});
+      const fuseM = new Fuse(res.matters||[],    {keys:['name','client','id'],threshold:0.3});
+      const fuseI = new Fuse(res.invoices||[],   {keys:['client','matter_name','id'],threshold:0.3});
+      const q = searchQuery.toLowerCase();
+      const foundA = fuseA.search(q).map(r=>r.item);
+      const foundM = fuseM.search(q).map(r=>r.item);
+      const foundI = fuseI.search(q).map(r=>r.item);
+      const aIds = new Set(foundA.map(a=>a.id));
+      const mIds = new Set(foundM.map(m=>m.id));
+      const iIds = new Set(foundI.map(i=>i.id));
+      setSearchResults({
+        activities:[...foundA,...(res.activities||[]).filter(a=>!aIds.has(a.id))].slice(0,40),
+        matters:   [...foundM,...(res.matters||[]).filter(m=>!mIds.has(m.id))],
+        invoices:  [...foundI,...(res.invoices||[]).filter(i=>!iIds.has(i.id))],
+        query: searchQuery
+      });
+      setSearching(false);
+    }, 350);
+    return()=>clearTimeout(t);
+  },[searchQuery, userId]); // userId is stable primitive string
+
+  // ── History ───────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(tab!=='history'||!userId) return;
+    fetchHistory(histYear, userId).then(res=>{
+      if(res.months) setHistMonths(res.months);
+      setHistYears([...new Set(allActs.map(a=>a.date?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a));
     });
-    const fuseMatters = new Fuse(res.matters, {
-      keys: ['name','client','id','description'],
-      threshold: 0.3, includeScore: true
-    });
-    const fuseInvoices = new Fuse(res.invoices, {
-      keys: ['client','matter_name','id','attorney'],
-      threshold: 0.3, includeScore: true
-    });
+  },[tab, histYear, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // If query is short, use SQL results; if has typos use fuzzy
-    const qLower = q.toLowerCase();
-    const acts    = fuseActs.search(qLower).map(r=>r.item).slice(0,30);
-    const matters = fuseMatters.search(qLower).map(r=>r.item);
-    const invoices= fuseInvoices.search(qLower).map(r=>r.item);
-
-    // Merge: SQL results + fuzzy results deduplicated
-    const actIds = new Set(acts.map(a=>a.id));
-    const allActs= [...acts, ...res.activities.filter(a=>!actIds.has(a.id))].slice(0,40);
-    const mIds   = new Set(matters.map(m=>m.id));
-    const allMat = [...matters, ...res.matters.filter(m=>!mIds.has(m.id))];
-    const iIds   = new Set(invoices.map(i=>i.id));
-    const allInv = [...invoices, ...res.invoices.filter(i=>!iIds.has(i.id))];
-
-    setSearchResults({ activities: allActs, matters: allMat, invoices: allInv, query: q });
-    setSearching(false);
-  }, []);
-
-  // Debounced search as user types
-  useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults(null); return; }
-    const t = setTimeout(() => doSearch(searchQuery), 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Load history for selected year ───────────────────────────────────
-  const loadHistory = useCallback(async (year) => {
-    const res = await fetchHistory(year, user?.id);
-    if (res.months) setHistMonths(res.months);
-    // Build years from allActs
-    const yrs = [...new Set(allActs.map(a=>a.date?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a);
-    if(!yrs.includes(String(year))) yrs.unshift(String(year));
-    setHistYears(yrs);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (tab === 'history') loadHistory(histYear);
-  }, [tab, histYear]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadMonth = useCallback(async (month) => {
+  const loadMonth = (month)=>{
+    if(!userId) return;
     setSelMonth(month);
-    const res = await fetchMonthActivities(month, user?.id);
-    if (res.activities) {
-      const acts = res.activities;
-      const tSec  = acts.reduce((s,a)=>s+Number(a.duration_seconds||0),0);
-      const bSec  = acts.filter(a=>a.is_billable).reduce((s,a)=>s+Number(a.duration_seconds||0),0);
-      const bU    = acts.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
-      setMonthData({ activities:acts, totals:{ sessions:acts.length, total_seconds:tSec, billable_seconds:bSec, billable_units:bU }});
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchMonthActivities(month, userId).then(res=>{
+      if(!res.activities) return;
+      const acts=res.activities;
+      const tSec=acts.reduce((s,a)=>s+Number(a.duration_seconds||0),0);
+      const bSec=acts.filter(a=>a.is_billable).reduce((s,a)=>s+Number(a.duration_seconds||0),0);
+      const bU=acts.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
+      setMonthData({activities:acts,totals:{sessions:acts.length,total_seconds:tSec,billable_seconds:bSec,billable_units:bU}});
+    });
+  };
 
   // ── Reclassify
   async function reclassify(id,cls){
