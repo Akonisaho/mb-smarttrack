@@ -13,6 +13,23 @@ export async function signIn(email, password) {
   return { data, error };
 }
 export async function signOut() { await supabase.auth.signOut(); }
+export async function signUp(email, password, fullName, role) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName, role: role || 'attorney' } }
+  });
+  if (error) return { error };
+  if (data.user) {
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      full_name: fullName,
+      role: role || 'attorney',
+      firm: 'Motsoeneng Bill'
+    });
+  }
+  return { data, error: null };
+}
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session;
