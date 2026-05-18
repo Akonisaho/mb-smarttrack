@@ -80,12 +80,12 @@ export default function Login() {
         .inp::placeholder { color: #444; }
         .inp option { background: #1A1A1A; color: #F0F0F0; }
         .btn {
-          background: #A2C52D; border: none; color: #0A0A0A; padding: 12px 14px;
+          background: #8DC63F; border: none; color: #0A0A0A; padding: 12px 14px;
           border-radius: 7px; font-size: 13px; font-family: 'DM Sans', system-ui, sans-serif;
           font-weight: 700; width: 100%; cursor: pointer;
         }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .lnk { background: none; border: none; color: #A2C52D; font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+        .lnk { background: none; border: none; color: #8DC63F; font-size: 12px; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
         .hint { font-size: 10px; color: #444; margin-top: 4px; }
       `}</style>
 
@@ -103,7 +103,7 @@ export default function Login() {
                 e.target.nextSibling.style.display='flex';
               }}
             />
-            <div style={{display:'none',width:64,height:64,background:'#A2C52D',borderRadius:10,alignItems:'center',justifyContent:'center',margin:'0 auto 10px',fontWeight:900,fontSize:20,color:'#0A0A0A',letterSpacing:'-0.05em'}}>MB</div>
+            <div style={{display:'none',width:64,height:64,background:'#8DC63F',borderRadius:10,alignItems:'center',justifyContent:'center',margin:'0 auto 10px',fontWeight:900,fontSize:20,color:'#0A0A0A',letterSpacing:'-0.05em'}}>MB</div>
             <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em'}}>SmartTrack</div>
             <div style={{fontSize:11,color:'#444',textTransform:'uppercase',letterSpacing:'.1em',marginTop:3}}>Motsoeneng Bill</div>
           </div>
