@@ -97,7 +97,7 @@ export default function Login() {
             <img
               src="/logo.png"
               alt="Motsoeneng Bill"
-              style={{width:80,height:80,objectFit:'contain',marginBottom:10}}
+              style={{width:80,height:80,objectFit:'contain',display:'block',margin:'0 auto 10px'}}
               onError={e=>{
                 e.target.style.display='none';
                 e.target.nextSibling.style.display='flex';
