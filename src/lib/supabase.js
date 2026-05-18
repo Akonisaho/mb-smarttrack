@@ -45,7 +45,7 @@ export async function getSession() {
 export async function getProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*, branches(id, name, address)')
+    .select('*')
     .eq('id', userId)
     .single();
   if (error) console.error('getProfile error:', error.message);
@@ -196,7 +196,7 @@ export async function fetchAllProfiles() {
   // Fetch ALL staff — attorneys, managers, bookkeepers — with their branch
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, branch_id, branches(id, name, address)')
+    .select('id, full_name, email, role, branch_id')
     .order('full_name');
   if (error) console.error('fetchAllProfiles:', error.message);
   return { profiles: data || [] };
