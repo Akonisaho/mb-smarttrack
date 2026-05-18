@@ -7,13 +7,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
 
-// ── Auth ─────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { data, error };
 }
-export async function signOut() { await supabase.auth.signOut(); }
-export async function signUp(email, password, fullName, role) {
+
+export async function signOut() {
+  await supabase.auth.signOut();
+}
+
+export async function signUp(email, password, fullName, role, branchId) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -22,20 +26,28 @@ export async function signUp(email, password, fullName, role) {
   if (error) return { error };
   if (data.user) {
     await supabase.from('profiles').upsert({
-      id: data.user.id,
+      id:        data.user.id,
       full_name: fullName,
-      role: role || 'attorney',
-      firm: 'Motsoeneng Bill'
+      email:     email,
+      role:      role || 'attorney',
+      branch_id: branchId || null,
+      firm:      'Motsoeneng Bill',
     });
   }
   return { data, error: null };
 }
+
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session;
 }
+
 export async function getProfile(userId) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*, branches(id, name, address)')
+    .eq('id', userId)
+    .single();
   if (error) console.error('getProfile error:', error.message);
   return data;
 }
@@ -49,19 +61,21 @@ export async function fetchActivities({ date, userId } = {}) {
   if (error) console.error('fetchActivities:', error.message);
   return { activities: data || [] };
 }
+
 export async function fetchAllActivities({ userId } = {}) {
-  // Include ALL activities except demo seeds — call logs (manual-call-*) are included
   const { data, error } = await supabase.from('activities').select('*')
     .not('agent_id', 'eq', 'demo').eq('user_id', userId)
     .order('start_time', { ascending: false }).limit(2000);
   if (error) console.error('fetchAllActivities:', error.message);
   return { activities: data || [] };
 }
+
 export async function patchActivity(id, updates) {
   const { error } = await supabase.from('activities').update(updates).eq('id', id);
   if (error) console.error('patchActivity:', error.message);
   return { error };
 }
+
 export async function patchActivityMatter(id, matter) {
   const { error } = await supabase.from('activities').update({ matter }).eq('id', id);
   if (error) console.error('patchActivityMatter:', error.message);
@@ -71,14 +85,14 @@ export async function patchActivityMatter(id, matter) {
 // ── Matters ───────────────────────────────────────────────────────────
 export async function fetchMatters(userId) {
   let q = supabase.from('matters').select('*').order('created_at', { ascending: false });
-  if (userId) q = q.eq('user_id', userId); // null = manager sees all
+  if (userId) q = q.eq('user_id', userId);
   const { data, error } = await q;
   if (error) console.error('fetchMatters:', error.message);
   return { matters: data || [] };
 }
+
 export async function createMatter({ id, name, client, description, userId }) {
   const matterId = id.trim().toUpperCase();
-  // Check for duplicate
   const { data: existing } = await supabase.from('matters').select('id').eq('id', matterId).eq('user_id', userId);
   if (existing && existing.length > 0) {
     return { data: null, error: { message: `Matter ID "${matterId}" already exists.` } };
@@ -90,6 +104,7 @@ export async function createMatter({ id, name, client, description, userId }) {
   if (error) console.error('createMatter:', error.message);
   return { data: data?.[0] || null, error };
 }
+
 export async function deleteMatter(id) {
   await supabase.from('activities').update({ matter: '' }).eq('matter', id);
   const { error } = await supabase.from('matters').delete().eq('id', id);
@@ -100,22 +115,21 @@ export async function deleteMatter(id) {
 // ── Invoices ──────────────────────────────────────────────────────────
 export async function fetchInvoices(userId) {
   let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
-  if (userId) q = q.eq('user_id', userId); // null = manager sees all
+  if (userId) q = q.eq('user_id', userId);
   const { data, error } = await q;
   if (error) console.error('fetchInvoices:', error.message);
   return { invoices: data || [] };
 }
+
 export async function saveInvoice(invoice, userId) {
   try {
-    // Use timestamp-based ID to avoid duplicate key conflicts
     const ts  = Date.now().toString().slice(-6);
     const id  = `MB-${ts}-${new Date().getFullYear()}`;
-    // Ensure matter_id is the manually entered ID not auto-generated
     const invoiceData = {
       id,
       user_id:      userId,
       client:       invoice.client       || '',
-      matter_id:    invoice.matter_id    || '',  // manually entered e.g. L2025/042
+      matter_id:    invoice.matter_id    || '',
       matter_name:  invoice.matter_name  || '',
       attorney:     invoice.attorney     || '',
       period:       invoice.period       || 'day',
@@ -133,13 +147,14 @@ export async function saveInvoice(invoice, userId) {
     return { data: null, error: { message: e.message } };
   }
 }
+
 export async function deleteInvoice(id) {
   const { error } = await supabase.from('invoices').delete().eq('id', id);
   if (error) console.error('deleteInvoice:', error.message);
   return { error };
 }
 
-// ── History ────────────────────────────────────────────────────────────
+// ── History ───────────────────────────────────────────────────────────
 export async function fetchHistory(year, userId) {
   const { data } = await supabase.from('activities').select('date, duration_seconds, is_billable, billing_units')
     .eq('user_id', userId).neq('agent_id', 'demo')
@@ -159,6 +174,7 @@ export async function fetchHistory(year, userId) {
   });
   return { months: Object.values(months) };
 }
+
 export async function fetchMonthActivities(month, userId) {
   const { data } = await supabase.from('activities').select('*')
     .eq('user_id', userId).neq('agent_id', 'demo')
@@ -169,24 +185,24 @@ export async function fetchMonthActivities(month, userId) {
 
 // ── Manager ───────────────────────────────────────────────────────────
 export async function fetchManagerSummary(date) {
-  // Get summary for selected date AND all-time totals
-  const { data } = await supabase.from('manager_summary').select('*')
-    .eq('date', date);
-  // Also get all-time billing units per attorney
+  const { data } = await supabase.from('manager_summary').select('*').eq('date', date);
   const { data: allTime } = await supabase.from('activities').select(
     'user_id, billing_units, is_billable, duration_seconds'
   ).neq('agent_id', 'demo');
   return { summary: data || [], allTime: allTime || [] };
 }
+
 export async function fetchAllProfiles() {
-  // Get all attorneys including those with no activity today
-  const { data, error } = await supabase.from('profiles').select('*')
-    .eq('role', 'attorney').order('full_name');
+  // Fetch ALL staff — attorneys, managers, bookkeepers — with their branch
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role, branch_id, branches(id, name, address)')
+    .order('full_name');
   if (error) console.error('fetchAllProfiles:', error.message);
   return { profiles: data || [] };
 }
 
-// ── Search (client-side fuzzy) ─────────────────────────────────────────
+// ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
   const q = query.toLowerCase().trim();
@@ -200,7 +216,7 @@ export async function searchAll(query, userId) {
   const match = (str) => str && str.toLowerCase().includes(q);
 
   return {
-    activities: (actsRes.data  || []).filter(a => match(a.window_title) || match(a.app_display_name) || match(a.matter)).slice(0, 40),
+    activities: (actsRes.data   || []).filter(a => match(a.window_title) || match(a.app_display_name) || match(a.matter)).slice(0, 40),
     matters:    (mattersRes.data || []).filter(m => match(m.name) || match(m.client) || match(m.id)),
     invoices:   (invoicesRes.data|| []).filter(i => match(i.client) || match(i.matter_name) || match(i.id)),
   };
