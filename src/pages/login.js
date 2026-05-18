@@ -2,115 +2,191 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, signIn, signUp } from '../lib/supabase';
-
+ 
 export default function Login() {
   const router = useRouter();
-  const [mode, setMode]       = useState('login'); // 'login' | 'signup'
-  const [email, setEmail]     = useState('');
+  const [mode, setMode]         = useState('login');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName]       = useState('');
-  const [role, setRole]       = useState('attorney');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-
+  const [name, setName]         = useState('');
+  const [role, setRole]         = useState('attorney');
+  const [branchId, setBranchId] = useState('');
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+ 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) router.replace('/');
     });
+    // Load branches for signup dropdown
+    supabase.from('branches').select('*').eq('is_active', true).order('name').then(({ data }) => {
+      setBranches(data || []);
+      if (data && data.length) setBranchId(data[0].id);
+    });
   }, []);
-
+ 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(''); setLoading(true);
+ 
     if (mode === 'login') {
       const { error } = await signIn(email, password);
       if (error) { setError(error.message); setLoading(false); return; }
       router.replace('/');
     } else {
       if (!name.trim()) { setError('Please enter your full name.'); setLoading(false); return; }
-      const { error } = await signUp(email, password, name, role);
+      if (!branchId) { setError('Please select your office branch.'); setLoading(false); return; }
+ 
+      const { data, error } = await signUp(email, password, name, role);
       if (error) { setError(error.message); setLoading(false); return; }
+ 
+      // Save branch to profile
+      if (data?.user) {
+        await supabase.from('profiles').update({ branch_id: branchId }).eq('id', data.user.id);
+      }
+ 
       setError('');
       setMode('login');
       setLoading(false);
-      alert('Account created! You can now log in.');
+      alert('Account created! Please sign in.');
     }
   }
-
+ 
   const S = {
-    page:  { background:'#0A0A0A', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',system-ui,sans-serif", padding:20 },
-    box:   { background:'#111', border:'1px solid #1A1A1A', borderRadius:12, padding:36, width:'100%', maxWidth:400 },
-    inp:   { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'10px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', width:'100%', outline:'none' },
-    btn:   { background:'#6CC04A', border:'none', color:'#0A0A0A', padding:'11px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', fontWeight:700, width:'100%', cursor:'pointer' },
-    lbl:   { fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:5, display:'block' },
-    link:  { background:'none', border:'none', color:'#6CC04A', fontSize:12, cursor:'pointer', fontFamily:'inherit', padding:0 },
-    sel:   { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'10px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', width:'100%' },
+    page: { background:'#0A0A0A', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans',system-ui,sans-serif", padding:20 },
+    box:  { background:'#111', border:'1px solid #1A1A1A', borderRadius:12, padding:36, width:'100%', maxWidth:420 },
+    inp:  { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'10px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', width:'100%', outline:'none' },
+    btn:  { background:'#6CC04A', border:'none', color:'#0A0A0A', padding:'11px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', fontWeight:700, width:'100%', cursor:'pointer' },
+    lbl:  { fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:5, display:'block' },
+    link: { background:'none', border:'none', color:'#6CC04A', fontSize:12, cursor:'pointer', fontFamily:'inherit', padding:0 },
+    sel:  { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'10px 14px', borderRadius:7, fontSize:13, fontFamily:'inherit', width:'100%' },
+    hint: { fontSize:10, color:'#444', marginTop:4 },
   };
-
+ 
+  const roleDescriptions = {
+    attorney: 'Tracks your own time, matters and invoices — sees your branch only',
+    manager:  'Sees all attorneys, all branches, trust accounting and billing summaries',
+    bookkeeper: 'Full trust accounting access across all branches — no time tracking',
+  };
+ 
   return (
     <>
-      <Head><title>MB SmartTrack — Login</title></Head>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0} input:focus,select:focus{outline:1px solid rgba(108,192,74,0.5);outline-offset:1px} select option{background:#1A1A1A;color:#F0F0F0}`}</style>
+      <Head><title>MB SmartTrack — {mode === 'login' ? 'Sign In' : 'Create Account'}</title></Head>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        input:focus,select:focus{outline:1px solid rgba(108,192,74,0.5);outline-offset:1px}
+        select option{background:#1A1A1A;color:#F0F0F0}
+        input::placeholder{color:#333}
+      `}</style>
       <div style={S.page}>
         <div style={S.box}>
+ 
           {/* Logo */}
           <div style={{textAlign:'center', marginBottom:28}}>
-            <img src="/logo.png" alt="MB" style={{width:80,height:80,objectFit:'contain',marginBottom:10}}/>
-            <div style={{fontSize:16, fontWeight:600, color:'#D0D0D0', marginBottom:4}}>SmartTrack</div>
-            <div style={{fontSize:11, color:'#444', textTransform:'uppercase', letterSpacing:'.08em'}}>Motsoeneng Bill Attorneys</div>
+            <div style={{width:60,height:60,background:'#A2C52D',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px',fontWeight:900,fontSize:22,color:'#0A0A0A',letterSpacing:'-0.04em'}}>MB</div>
+            <div style={{fontSize:17,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em'}}>SmartTrack</div>
+            <div style={{fontSize:11,color:'#444',textTransform:'uppercase',letterSpacing:'.1em',marginTop:3}}>Motsoeneng Bill</div>
           </div>
-
-          <div style={{fontSize:14, fontWeight:600, color:'#D0D0D0', marginBottom:20, textAlign:'center'}}>
+ 
+          <div style={{fontSize:14,fontWeight:600,color:'#D0D0D0',marginBottom:20,textAlign:'center'}}>
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
           </div>
-
+ 
           <form onSubmit={handleSubmit}>
-            <div style={{display:'flex', flexDirection:'column', gap:14}}>
-              {mode === 'signup' && (
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+ 
+              {/* Signup only fields */}
+              {mode === 'signup' && (<>
                 <div>
                   <label style={S.lbl}>Full name *</label>
-                  <input style={S.inp} type="text" placeholder="e.g. Adv. Takalani Muthelo" value={name} onChange={e=>setName(e.target.value)} required/>
+                  <input style={S.inp} type="text" placeholder="e.g. Adv. Sarah Nkosi" value={name} onChange={e=>setName(e.target.value)} required/>
                 </div>
-              )}
+              </>)}
+ 
+              {/* Email */}
               <div>
                 <label style={S.lbl}>Email address *</label>
                 <input style={S.inp} type="email" placeholder="your@email.com" value={email} onChange={e=>setEmail(e.target.value)} required/>
               </div>
+ 
+              {/* Password */}
               <div>
                 <label style={S.lbl}>Password *</label>
                 <input style={S.inp} type="password" placeholder="Minimum 6 characters" value={password} onChange={e=>setPassword(e.target.value)} required minLength={6}/>
               </div>
-              {mode === 'signup' && (
+ 
+              {/* Signup only — role + branch */}
+              {mode === 'signup' && (<>
+ 
+                {/* Role */}
                 <div>
                   <label style={S.lbl}>Role *</label>
                   <select style={S.sel} value={role} onChange={e=>setRole(e.target.value)}>
-                    <option value="attorney">Attorney</option>
+                    <option value="attorney">Attorney / Fee Earner</option>
                     <option value="manager">Practice Manager</option>
+                    <option value="bookkeeper">Bookkeeper</option>
                   </select>
-                  <div style={{fontSize:10, color:'#444', marginTop:4}}>Managers see billing summaries for all attorneys</div>
+                  <div style={S.hint}>{roleDescriptions[role]}</div>
                 </div>
-              )}
+ 
+                {/* Branch */}
+                <div>
+                  <label style={S.lbl}>Office branch *</label>
+                  <select style={S.sel} value={branchId} onChange={e=>setBranchId(e.target.value)}>
+                    {!branches.length && <option value="">Loading branches...</option>}
+                    {branches.map(b=>(
+                      <option key={b.id} value={b.id}>{b.name} — {b.address}</option>
+                    ))}
+                  </select>
+                  <div style={S.hint}>Attorneys only see data from their branch</div>
+                </div>
+ 
+              </>)}
+ 
+              {/* Error */}
               {error && (
-                <div style={{background:'rgba(220,80,80,0.1)', border:'1px solid rgba(220,80,80,0.3)', borderRadius:6, padding:'10px 14px', fontSize:12, color:'#E05252'}}>
+                <div style={{background:'rgba(220,80,80,0.1)',border:'1px solid rgba(220,80,80,0.3)',borderRadius:6,padding:'10px 14px',fontSize:12,color:'#E05252'}}>
                   {error}
                 </div>
               )}
-              <button style={{...S.btn, opacity: loading ? 0.7 : 1}} type="submit" disabled={loading}>
+ 
+              {/* Submit */}
+              <button style={{...S.btn,opacity:loading?0.7:1}} type="submit" disabled={loading}>
                 {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
               </button>
+ 
             </div>
           </form>
-
-          <div style={{textAlign:'center', marginTop:20, fontSize:12, color:'#555'}}>
+ 
+          {/* Mode toggle */}
+          <div style={{textAlign:'center',marginTop:20,fontSize:12,color:'#555'}}>
             {mode === 'login' ? (
               <>Don't have an account? <button style={S.link} onClick={()=>{setMode('signup');setError('');}}>Create one</button></>
             ) : (
               <>Already have an account? <button style={S.link} onClick={()=>{setMode('login');setError('');}}>Sign in</button></>
             )}
           </div>
-
-          <div style={{marginTop:24, padding:'12px 14px', background:'#0D0D0D', borderRadius:7, fontSize:11, color:'#444', textAlign:'center', lineHeight:1.6}}>
-            Your data is protected and private.<br/>Only you can see your tracked activities.
+ 
+          {/* Branch info on login */}
+          {mode === 'login' && (
+            <div style={{marginTop:20,display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+              {[
+                {name:'Johannesburg',addr:'Houghton Estate'},
+                {name:'Pretoria',addr:'Ashlea Gardens'},
+                {name:'Durban',addr:'Umhlanga'},
+              ].map(b=>(
+                <div key={b.name} style={{background:'#0D0D0D',borderRadius:6,padding:'8px 10px',textAlign:'center'}}>
+                  <div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:2}}>{b.name}</div>
+                  <div style={{fontSize:10,color:'#444'}}>{b.addr}</div>
+                </div>
+              ))}
+            </div>
+          )}
+ 
+          <div style={{marginTop:16,padding:'10px 14px',background:'#0D0D0D',borderRadius:7,fontSize:11,color:'#444',textAlign:'center',lineHeight:1.6}}>
+            Your data is private and encrypted.<br/>Only your branch data is visible to you.
           </div>
         </div>
       </div>
