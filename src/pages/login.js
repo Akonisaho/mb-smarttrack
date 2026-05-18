@@ -45,11 +45,19 @@ export default function Login() {
     } else {
       if (!name.trim()) { setError('Please enter your full name.'); setLoading(false); return; }
       if (!branchId)    { setError('Please select your office branch.'); setLoading(false); return; }
-      const { data, error } = await signUp(email, password, name, role, branchId);
-      if (error) { setError(error.message); setLoading(false); return; }
-      if (data?.user) {
-        await supabase.from('profiles').update({ branch_id: branchId }).eq('id', data.user.id);
-      }
+     const { data, error } = await signUp(email, password, name, role, branchId);
+if (error) { setError(error.message); setLoading(false); return; }
+if (data?.user) {
+  await new Promise(r => setTimeout(r, 1500));
+  await supabase.from('profiles').upsert({
+    id:        data.user.id,
+    full_name: name,
+    email:     email,
+    role:      role || 'attorney',
+    branch_id: branchId || null,
+    firm:      'Motsoeneng Bill',
+  });
+}
       setMode('login');
       setLoading(false);
       alert('Account created! Please sign in.');
