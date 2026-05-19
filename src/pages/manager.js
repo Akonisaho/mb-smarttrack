@@ -158,7 +158,9 @@ export default function Manager() {
     load();
   }
 
-  const filteredProfiles = selBranch==='all' ? profiles : profiles.filter(p=>p.branch_id===selBranch);
+  const isBranchManager = profile?.role==='branch_manager';
+const myBranch = isBranchManager ? profile?.branch_id : selBranch;
+const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filter(p=>p.branch_id===myBranch);
   const filtered = selAtty==='all' ? summary : summary.filter(s=>s.user_id===selAtty);
   const filteredAllTime = selAtty==='all' ? allTime : allTime.filter(a=>a.user_id===selAtty);
   const firmTotalSec   = filteredAllTime.reduce((s,a)=>s+(a.duration_seconds||0),0);
@@ -306,20 +308,29 @@ export default function Manager() {
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
                 <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
-                <select style={C.sel} value={selBranch} onChange={e=>{setSelBranch(e.target.value);setSelAtty('all');}}>
-                  <option value="all">All branches</option>
-                  {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                {!isBranchManager&&(
+  <select style={C.sel} value={selBranch} onChange={e=>{setSelBranch(e.target.value);setSelAtty('all');}}>
+    <option value="all">All branches</option>
+    {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+  </select>
+)}
+{isBranchManager&&(
+  <span style={{fontSize:12,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'5px 12px',borderRadius:6}}>
+    {branches.find(b=>b.id===profile?.branch_id)?.name||'Your branch'}
+  </span>
+)}
                 <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}>
                   <option value="all">All attorneys</option>
                   {filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
-                <select style={C.sel} value={rate} onChange={e=>setRate(parseInt(e.target.value)||150)}>
-                  <option value={150}>R150/unit</option>
-                  <option value={200}>R200/unit</option>
-                  <option value={250}>R250/unit</option>
-                  <option value={300}>R300/unit</option>
-                </select>
+<input 
+  type="number" 
+  style={{...C.sel,width:120}} 
+  value={rate} 
+  onChange={e=>setRate(parseInt(e.target.value)||150)}
+  placeholder="R/unit"
+  min={50}
+/>
               </div>
             </div>
 
