@@ -1,11 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { email, fullName, role, branchId } = req.body;
@@ -15,39 +7,53 @@ export default async function handler(req, res) {
   try {
     const tempPass = 'MB@' + Math.random().toString(36).slice(2,8).toUpperCase() + '!2026';
 
-    // Use signUp via anon key — works on free plan
-    const supabaseAnon = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      { auth: { autoRefreshToken: false, persistSession: false } }
+    // Create user via Supabase REST API directly
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+        body: JSON.stringify({
+          email,
+          password: tempPass,
+          email_confirm: true,
+          user_metadata: { full_name: fullName, role, branch_id: branchId }
+        }),
+      }
     );
 
-    const { data, error } = await supabaseAnon.auth.signUp({
-      email,
-      password: tempPass,
-      options: {
-        data: { full_name: fullName, role: role || 'attorney' }
-      }
-    });
-
-    console.log('SignUp result:', JSON.stringify({ 
-      userId: data?.user?.id, 
-      error: error?.message 
+    const userData = await response.json();
+    console.log('REST API result:', JSON.stringify({ 
+      status: response.status,
+      userId: userData?.id,
+      error: userData?.message 
     }));
 
-    if (error) return res.status(400).json({ error: error.message });
-    if (!data?.user) return res.status(400).json({ error: 'No user returned' });
+    if (!response.ok) return res.status(400).json({ error: userData?.message || 'Failed to create user' });
 
-    await new Promise(r => setTimeout(r, 2000));
-
-    await supabaseAdmin.from('profiles').upsert({
-      id:        data.user.id,
-      full_name: fullName,
-      email:     email,
-      role:      role || 'attorney',
-      branch_id: branchId || null,
-      firm:      'Motsoeneng Bill',
-    });
+    // Update profile with branch
+    await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${userData.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+        body: JSON.stringify({
+          full_name: fullName,
+          email,
+          role: role || 'attorney',
+          branch_id: branchId,
+          firm: 'Motsoeneng Bill',
+        }),
+      }
+    );
 
     // Send email via Resend
     await fetch('https://api.resend.com/emails', {
@@ -68,7 +74,7 @@ export default async function handler(req, res) {
             </div>
             <div style="background:white;border-radius:12px;padding:32px;">
               <h2 style="color:#111;margin-bottom:16px;">Welcome, ${fullName}!</h2>
-              <p style="color:#555;margin-bottom:24px;">You have been added to MB SmartTrack — the firm's time tracking and billing system.</p>
+              <p style="color:#555;margin-bottom:24px;">You have been added to MB SmartTrack by Motsoeneng Bill Attorneys.</p>
               <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin-bottom:24px;">
                 <p style="margin:0;color:#333;"><strong>Website:</strong> mb-smarttrack.vercel.app</p>
                 <p style="margin:8px 0 0;color:#333;"><strong>Email:</strong> ${email}</p>
