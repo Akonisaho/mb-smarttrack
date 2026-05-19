@@ -213,7 +213,7 @@ const rFormDirty=useRef(false);
       setBranches(branchRes.data||[]);
       setLockedPeriods((locksRes.data||[]).map(l=>l.period));
       setBalanceAlerts(alertsRes.data||[]);
-  if(accs.length&&!rFormDirty.current){
+  if(accs.length&&!rForm.amount&&!rForm.matterId){
   setRForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
   setPForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
   setTForm(f=>f.fromAccountId?f:{...f,fromAccountId:accs[0].id});
@@ -234,7 +234,7 @@ const rFormDirty=useRef(false);
   useEffect(()=>{ 
   if(tab==='trust'&&userId){ 
     loadTrust(); 
-    const t=setInterval(loadTrust,60000);
+    const t=setInterval(loadTrust,300000);
     return()=>clearInterval(t);
   } 
 },[tab,userId]);
