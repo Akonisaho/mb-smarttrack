@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     );
 
     // Send email via Resend
-    await fetch('https://api.resend.com/emails', {
+    const resendResult = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +91,8 @@ export default async function handler(req, res) {
         `,
       }),
     });
-
+const resendData = await resendResult.json();
+console.log('Resend result:', JSON.stringify({ status: resendResult.status, data: resendData }));
     return res.status(200).json({ success: true });
   } catch(e) {
     console.error('Exception:', e.message);
