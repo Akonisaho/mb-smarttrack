@@ -25,6 +25,7 @@ export async function signUp(email, password, fullName, role, branchId) {
   });
   if (error) return { error };
   if (data.user) {
+    await new Promise(r => setTimeout(r, 1500));
     await supabase.from('profiles').upsert({
       id:        data.user.id,
       full_name: fullName,
@@ -50,6 +51,32 @@ export async function getProfile(userId) {
     .single();
   if (error) console.error('getProfile error:', error.message);
   return data;
+}
+
+// ── Invite Staff (manager creates account directly) ───────────────────
+export async function inviteStaff({ fullName, email, role, branchId, tempPassword }) {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: tempPassword,
+      options: { data: { full_name: fullName, role: role || 'attorney' } }
+    });
+    if (error) return { error };
+    if (!data.user) return { error: { message: 'Failed to create account' } };
+    await new Promise(r => setTimeout(r, 1500));
+    const { error: profileError } = await supabase.from('profiles').upsert({
+      id:        data.user.id,
+      full_name: fullName,
+      email:     email,
+      role:      role || 'attorney',
+      branch_id: branchId || null,
+      firm:      'Motsoeneng Bill',
+    });
+    if (profileError) return { error: profileError };
+    return { data, error: null };
+  } catch(e) {
+    return { error: { message: e.message } };
+  }
 }
 
 // ── Activities ────────────────────────────────────────────────────────
@@ -193,7 +220,6 @@ export async function fetchManagerSummary(date) {
 }
 
 export async function fetchAllProfiles() {
-  // Fetch ALL staff — attorneys, managers, bookkeepers — with their branch
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, email, role, branch_id')
@@ -206,15 +232,12 @@ export async function fetchAllProfiles() {
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
   const q = query.toLowerCase().trim();
-
   const [actsRes, mattersRes, invoicesRes] = await Promise.all([
     supabase.from('activities').select('*').eq('user_id', userId).order('start_time', { ascending: false }).limit(500),
     supabase.from('matters').select('*').eq('user_id', userId),
     supabase.from('invoices').select('*').eq('user_id', userId).limit(100),
   ]);
-
   const match = (str) => str && str.toLowerCase().includes(q);
-
   return {
     activities: (actsRes.data   || []).filter(a => match(a.window_title) || match(a.app_display_name) || match(a.matter)).slice(0, 40),
     matters:    (mattersRes.data || []).filter(m => match(m.name) || match(m.client) || match(m.id)),
