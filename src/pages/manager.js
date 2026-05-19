@@ -142,7 +142,14 @@ export default function Manager() {
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
-  async function removeStaff(userId,name){ if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return; const {error}=await supabase.from('profiles').delete().eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ ${name} removed.`,'success'); load(); }
+  async function removeStaff(userId,name){
+  if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return;
+  const res=await fetch('/api/remove-staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})});
+  const data=await res.json();
+  if(!res.ok){showAlert('Error: '+data.error,'error');return;}
+  showAlert(`✓ ${name} removed.`,'success');
+  load();
+}
 
   async function handleInvite(){
     if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
