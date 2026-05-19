@@ -181,7 +181,7 @@ const rFormDirty=useRef(false);
       setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
     };
     doLoad();
-    const t=setInterval(doLoad,15000);
+    const t=setInterval(doLoad,120000);
     return()=>{ cancelled=true; clearInterval(t); };
   },[authLoading,userId,selDate]);
 
