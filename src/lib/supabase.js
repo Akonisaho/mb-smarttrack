@@ -54,32 +54,15 @@ export async function getProfile(userId) {
 }
  
 // ── Invite Staff (manager creates account directly) ───────────────────
-export async function inviteStaff({ fullName, email, role, branchId, tempPassword }) {
+export async function inviteStaff({ fullName, email, role, branchId }) {
   try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: tempPassword,
-      options: { data: { full_name: fullName, role: role || 'attorney' } }
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, email, role, branchId }),
     });
-    if (error) return { error };
-    if (!data.user) return { error: { message: 'Failed to create account' } };
-
-    // Retry profile save up to 3 times
-    let saved = false;
-    for (let i = 0; i < 3; i++) {
-      await new Promise(r => setTimeout(r, 1000));
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id:        data.user.id,
-        full_name: fullName,
-        email:     email,
-        role:      role || 'attorney',
-        branch_id: branchId || null,
-        firm:      'Motsoeneng Bill',
-      });
-      if (!profileError) { saved = true; break; }
-    }
-
-    if (!saved) return { error: { message: 'Account created but profile save failed.' } };
+    const data = await res.json();
+    if (!res.ok) return { error: { message: data.error || 'Invitation failed' } };
     return { data, error: null };
   } catch(e) {
     return { error: { message: e.message } };
