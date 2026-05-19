@@ -503,20 +503,78 @@ const rFormDirty=useRef(false);
         {selectedTrustMatter&&(<div style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#4A90D9'}}>{selectedTrustMatter} — {matters.find(m=>m.id===selectedTrustMatter)?.client} — Running ledger</div><button style={{...C.btn('g'),fontSize:11}} onClick={()=>printTrustStatement(matters.find(m=>m.id===selectedTrustMatter),ledger)}>Print statement</button></div>{!ledger.length?<div style={{color:'#333',fontSize:12,textAlign:'center',padding:20}}>No transactions yet.</div>:(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Type','Receipt No','Reference','Narration','Debit','Credit','Balance'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{ledger.map((t,i)=>{ const isR=t.type==='receipt'; return(<tr key={i}><td style={{...C.td,fontFamily:'monospace',fontSize:10,whiteSpace:'nowrap'}}>{fmtDate(t.date)}</td><td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:isR?'rgba(108,192,74,0.1)':t.type==='payment'?'rgba(220,80,80,0.1)':'rgba(74,144,217,0.1)',color:isR?'#6CC04A':t.type==='payment'?'#E05252':'#4A90D9'}}>{t.type}</span></td><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#555'}}>{t.receipt_no||'—'}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{t.reference||'—'}</td><td style={{...C.td,fontSize:11}}>{t.narration}</td><td style={{...C.td,fontFamily:'monospace',color:'#E05252',textAlign:'right'}}>{!isR?fmtR(t.amount):''}</td><td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',textAlign:'right'}}>{isR?fmtR(t.amount):''}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:t.runningBalance>=0?'#6CC04A':'#E05252',textAlign:'right'}}>{fmtR(t.runningBalance)}</td></tr>); })}</tbody></table></div>)}</div>)}
       </div>)}
 
-      {trustTab==='receipt'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-        <div style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>New trust receipt</div><span style={{fontSize:10,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'2px 10px',borderRadius:20}}>Next: {nextReceiptNo(trustTransactions)}</span></div>
-          <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>{isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="text" inputMode="decimal" style={C.tinp} placeholder="e.g. 10000.00" defaultValue={rForm.amount} onBlur={e=>setRForm(f=>({...f,amount:e.target.value}))}/></div></div>
-            <div><label style={C.lbl}>Matter *</label><select style={C.tinp} value={rForm.matterId} onChange={e=>setRForm(f=>({...f,matterId:e.target.value}))}><option value="">Select matter...</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}</select></div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Trust bank account</label><select style={C.tinp} value={rForm.accountId} onChange={e=>setRForm(f=>({...f,accountId:e.target.value}))}>{trustAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label style={C.lbl}>Branch</label><select style={C.tinp} value={rForm.branchId} onChange={e=>setRForm(f=>({...f,branchId:e.target.value}))}><option value="">Select branch...</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div></div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Reference</label><input style={C.tinp} placeholder="EFT ref, cheque no." value={rForm.reference} onChange={e=>setRForm(f=>({...f,reference:e.target.value}))}/></div><div><label style={C.lbl}>Received from</label><input style={C.tinp} placeholder="Payer name" value={rForm.receivedFrom} onChange={e=>setRForm(f=>({...f,receivedFrom:e.target.value}))}/></div></div>
-            <div><label style={C.lbl}>Narration *</label><input style={C.tinp} placeholder="Description of receipt" value={rForm.narration} onChange={e=>setRForm(f=>({...f,narration:e.target.value}))}/></div>
-            <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:4}}><button style={C.btn()} onClick={()=>setRForm(f=>({...f,amount:'',matterId:'',reference:'',receivedFrom:'',narration:''}))}>Clear</button><button style={C.btn('p')} onClick={postReceipt} disabled={trustSaving||isLocked(rForm.date)}>{trustSaving?'Posting...':'Post receipt'}</button></div>
+{trustTab==='receipt'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+  <div style={C.card}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+      <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>New trust receipt</div>
+      <span style={{fontSize:10,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'2px 10px',borderRadius:20}}>Next: {nextReceiptNo(trustTransactions)}</span>
+    </div>
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div>
+          <label style={C.lbl}>Date *</label>
+          <input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>
+          {isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}
+        </div>
+        <div>
+          <label style={C.lbl}>Amount (ZAR) *</label>
+          <input type="text" inputMode="decimal" style={C.tinp} placeholder="e.g. 10000.00" defaultValue={rForm.amount} onBlur={e=>{ const v=e.target.value.replace(/[^0-9.]/g,''); e.target.value=v; setRForm(f=>({...f,amount:v})); }}/>
+        </div>
+      </div>
+      <div>
+        <label style={C.lbl}>Matter *</label>
+        <select style={C.tinp} value={rForm.matterId} onChange={e=>setRForm(f=>({...f,matterId:e.target.value}))}>
+          <option value="">Select matter...</option>
+          {matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}
+        </select>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div>
+          <label style={C.lbl}>Trust bank account</label>
+          <select style={C.tinp} value={rForm.accountId} onChange={e=>setRForm(f=>({...f,accountId:e.target.value}))}>
+            {trustAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={C.lbl}>Branch</label>
+          <div style={{...C.tinp,color:'#4A90D9',display:'flex',alignItems:'center'}}>
+            {branches.find(b=>b.id===profile?.branch_id)?.name||'Not assigned'}
           </div>
         </div>
-        <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Recent receipts</div><div style={{overflowY:'auto',maxHeight:420}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Receipt','Date','Matter','Client','Amount','Branch'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!trustTransactions.filter(t=>t.type==='receipt').length&&<tr><td colSpan={6} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No receipts yet</td></tr>}{trustTransactions.filter(t=>t.type==='receipt').map((t,i)=>{ const m=matters.find(x=>x.id===t.matter_id),br=branches.find(b=>b.id===t.branch_id); return(<tr key={i}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#4A90D9'}}>{t.receipt_no}</td><td style={{...C.td,fontSize:10}}>{fmtDate(t.date)}</td><td style={{...C.td,fontSize:10,color:'#A78BFA'}}>{t.matter_id}</td><td style={C.td}>{m?.client||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',textAlign:'right'}}>{fmtR(t.amount)}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td></tr>); })}</tbody></table></div></div>
-      </div>)}
-
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div>
+          <label style={C.lbl}>Reference</label>
+          <input style={C.tinp} placeholder="EFT ref, cheque no." defaultValue={rForm.reference} onBlur={e=>setRForm(f=>({...f,reference:e.target.value}))}/>
+        </div>
+        <div>
+          <label style={C.lbl}>Received from</label>
+          <input style={C.tinp} placeholder="Payer name" defaultValue={rForm.receivedFrom} onBlur={e=>setRForm(f=>({...f,receivedFrom:e.target.value}))}/>
+        </div>
+      </div>
+      <div>
+        <label style={C.lbl}>Narration *</label>
+        <input style={C.tinp} placeholder="Description of receipt" defaultValue={rForm.narration} onBlur={e=>setRForm(f=>({...f,narration:e.target.value}))}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:4}}>
+        <button style={C.btn()} onClick={()=>setRForm(f=>({...f,amount:'',matterId:'',reference:'',receivedFrom:'',narration:''}))}>Clear</button>
+        <button style={C.btn('p')} onClick={()=>{ setRForm(f=>({...f,branchId:profile?.branch_id||''})); postReceipt(); }} disabled={trustSaving||isLocked(rForm.date)}>{trustSaving?'Posting...':'Post receipt'}</button>
+      </div>
+    </div>
+  </div>
+  <div style={C.card}>
+    <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Recent receipts</div>
+    <div style={{overflowY:'auto',maxHeight:420}}>
+      <table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead><tr>{['Receipt','Date','Matter','Client','Amount','Branch'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {!trustTransactions.filter(t=>t.type==='receipt').length&&<tr><td colSpan={6} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No receipts yet</td></tr>}
+          {trustTransactions.filter(t=>t.type==='receipt').map((t,i)=>{ const m=matters.find(x=>x.id===t.matter_id),br=branches.find(b=>b.id===t.branch_id); return(<tr key={i}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#4A90D9'}}>{t.receipt_no}</td><td style={{...C.td,fontSize:10}}>{fmtDate(t.date)}</td><td style={{...C.td,fontSize:10,color:'#A78BFA'}}>{t.matter_id}</td><td style={C.td}>{m?.client||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#6CC04A',textAlign:'right'}}>{fmtR(t.amount)}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td></tr>); })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>)}
       {trustTab==='payment'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
         <div style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>New trust payment</div><span style={{fontSize:10,color:'#EAB308',border:'1px solid rgba(234,179,8,0.3)',padding:'2px 10px',borderRadius:20}}>≥ {fmtR(APPROVAL_THRESHOLD)} needs approval</span></div>
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
