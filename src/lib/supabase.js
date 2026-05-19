@@ -63,16 +63,23 @@ export async function inviteStaff({ fullName, email, role, branchId, tempPasswor
     });
     if (error) return { error };
     if (!data.user) return { error: { message: 'Failed to create account' } };
-    await new Promise(r => setTimeout(r, 1500));
-    const { error: profileError } = await supabase.from('profiles').upsert({
-      id:        data.user.id,
-      full_name: fullName,
-      email:     email,
-      role:      role || 'attorney',
-      branch_id: branchId || null,
-      firm:      'Motsoeneng Bill',
-    });
-    if (profileError) return { error: profileError };
+
+    // Retry profile save up to 3 times
+    let saved = false;
+    for (let i = 0; i < 3; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id:        data.user.id,
+        full_name: fullName,
+        email:     email,
+        role:      role || 'attorney',
+        branch_id: branchId || null,
+        firm:      'Motsoeneng Bill',
+      });
+      if (!profileError) { saved = true; break; }
+    }
+
+    if (!saved) return { error: { message: 'Account created but profile save failed.' } };
     return { data, error: null };
   } catch(e) {
     return { error: { message: e.message } };
