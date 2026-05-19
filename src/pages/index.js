@@ -317,7 +317,7 @@ const rFormDirty=useRef(false);
     if(isNaN(amount)||amount<=0){ showTrustAlert('Enter a valid amount.','error'); return; }
     setTrustSaving(true);
     const receiptNo=nextReceiptNo(trustTransactions);
-    const {error}=await supabase.from('trust_transactions').insert([{type:'receipt',matter_id:rForm.matterId,user_id:userId,date:rForm.date,amount,receipt_no:receiptNo,received_from:rForm.receivedFrom,trust_account_id:rForm.accountId||null,reference:rForm.reference,narration:rForm.narration,captured_by:userId,branch_id:rForm.branchId||null,status:'posted'}]);
+    branch_id:rForm.branchId||profile?.branch_id||null,
     if(error){ showTrustAlert('Error: '+error.message,'error'); setTrustSaving(false); return; }
     showTrustAlert(`✓ Receipt ${receiptNo} posted — ${fmtR(amount)} credited to ${matters.find(m=>m.id===rForm.matterId)?.client||rForm.matterId}`,'success');
     setRForm(f=>({...f,amount:'',matterId:'',reference:'',receivedFrom:'',narration:''}));
