@@ -230,7 +230,13 @@ export default function App() {
     setTrustLoading(false);
   },[userId]);
 
-  useEffect(()=>{ if(tab==='trust'&&userId) loadTrust(); },[tab,userId]);
+  useEffect(()=>{ 
+  if(tab==='trust'&&userId){ 
+    loadTrust(); 
+    const t=setInterval(loadTrust,60000);
+    return()=>clearInterval(t);
+  } 
+},[tab,userId]);
 
   useEffect(()=>{
     if(!searchQuery.trim()){ setSearchResults(null); return; }
@@ -499,7 +505,7 @@ export default function App() {
       {trustTab==='receipt'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
         <div style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>New trust receipt</div><span style={{fontSize:10,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'2px 10px',borderRadius:20}}>Next: {nextReceiptNo(trustTransactions)}</span></div>
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>{isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="number" style={C.tinp} placeholder="0.00" min="0.01" step="0.01" value={rForm.amount} onChange={e=>setRForm(f=>({...f,amount:e.target.value}))}/></div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>{isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="text" inputMode="decimal" style={C.tinp} placeholder="e.g. 10000.00" value={rForm.amount} onChange={e=>setRForm(f=>({...f,amount:e.target.value}))}/></div></div>
             <div><label style={C.lbl}>Matter *</label><select style={C.tinp} value={rForm.matterId} onChange={e=>setRForm(f=>({...f,matterId:e.target.value}))}><option value="">Select matter...</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}</select></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Trust bank account</label><select style={C.tinp} value={rForm.accountId} onChange={e=>setRForm(f=>({...f,accountId:e.target.value}))}>{trustAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label style={C.lbl}>Branch</label><select style={C.tinp} value={rForm.branchId} onChange={e=>setRForm(f=>({...f,branchId:e.target.value}))}><option value="">Select branch...</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Reference</label><input style={C.tinp} placeholder="EFT ref, cheque no." value={rForm.reference} onChange={e=>setRForm(f=>({...f,reference:e.target.value}))}/></div><div><label style={C.lbl}>Received from</label><input style={C.tinp} placeholder="Payer name" value={rForm.receivedFrom} onChange={e=>setRForm(f=>({...f,receivedFrom:e.target.value}))}/></div></div>
