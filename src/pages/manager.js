@@ -52,7 +52,7 @@ export default function Manager() {
   const [trustAlert,setTrustAlert]       = useState({msg:'',type:''});
   const [matters,setMatters]             = useState([]);
   const [showInvite,setShowInvite]       = useState(false);
-  const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:'',tempPassword:''});
+  const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:''});
   const [inviting,setInviting]           = useState(false);
   const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
 
@@ -145,16 +145,16 @@ export default function Manager() {
   async function removeStaff(userId,name){ if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return; const {error}=await supabase.from('profiles').delete().eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ ${name} removed.`,'success'); load(); }
 
   async function handleInvite(){
-    if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
+    if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
     setInviting(true);
     setInviteMsg({msg:'',type:''});
     const {error}=await inviteStaff(inviteForm);
     if(error){ setInviteMsg({msg:'Error: '+error.message,type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Share their temporary password: ${inviteForm.tempPassword}`,'success');
+    showAlert(`✓ Invitation sent to ${inviteForm.email}. They will receive an email to set their password.`,'success');
     setInviting(false);
     setShowInvite(false);
-    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||'',tempPassword:''});
+    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
     load();
   }
 
@@ -534,7 +534,7 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
                 <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Staff Management</div>
                 <div style={{fontSize:11,color:'#444',marginTop:2}}>{profiles.length} staff members · {branches.length} branches · No IT needed</div>
               </div>
-              <button style={C.btn('p')} onClick={()=>{ setShowInvite(true); setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||'',tempPassword:''}); setInviteMsg({msg:'',type:''}); }}>+ Add Staff Member</button>
+              <button style={C.btn('p')} onClick={()=>{ setShowInvite(true); setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''}); setInviteMsg({msg:'',type:''}); }}>+ Add Staff Member</button>
             </div>
 
             {/* Staff table */}
@@ -630,15 +630,11 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label style={lbl}>Temporary password *</label>
-                  <input className="mb-inp" type="text" placeholder="e.g. MB@2026! — share this with them" value={inviteForm.tempPassword} onChange={e=>setInviteForm(f=>({...f,tempPassword:e.target.value}))}/>
-                  <div style={{fontSize:10,color:'#444',marginTop:4}}>They will use this to sign in for the first time</div>
-                </div>
+
                 {inviteMsg.msg&&(<div style={{background:inviteMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${inviteMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:inviteMsg.type==='error'?'#E05252':'#8DC63F'}}>{inviteMsg.msg}</div>)}
                 <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>
                   <button style={C.btn()} onClick={()=>setShowInvite(false)}>Cancel</button>
-                  <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
+                  <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
                 </div>
               </div>
             </div>
