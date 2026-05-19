@@ -1,22 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-
+ 
 const SUPABASE_URL  = 'https://zpqdhodxyrkfcgameekn.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwcWRob2R4eXJrZmNnYW1lZWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzU3MTcsImV4cCI6MjA5MzU1MTcxN30.sjYPAoi0Xc5tzRtjaFw-2odNAno4axh8R4TTOAAtY40';
-
+ 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
-
+ 
 // ── Auth ──────────────────────────────────────────────────────────────
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { data, error };
 }
-
+ 
 export async function signOut() {
   await supabase.auth.signOut();
 }
-
+ 
 export async function signUp(email, password, fullName, role, branchId) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -37,12 +37,12 @@ export async function signUp(email, password, fullName, role, branchId) {
   }
   return { data, error: null };
 }
-
+ 
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session;
 }
-
+ 
 export async function getProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
@@ -52,7 +52,7 @@ export async function getProfile(userId) {
   if (error) console.error('getProfile error:', error.message);
   return data;
 }
-
+ 
 // ── Invite Staff (manager creates account directly) ───────────────────
 export async function inviteStaff({ fullName, email, role, branchId, tempPassword }) {
   try {
@@ -78,7 +78,7 @@ export async function inviteStaff({ fullName, email, role, branchId, tempPasswor
     return { error: { message: e.message } };
   }
 }
-
+ 
 // ── Activities ────────────────────────────────────────────────────────
 export async function fetchActivities({ date, userId } = {}) {
   let q = supabase.from('activities').select('*').neq('agent_id', 'demo').eq('user_id', userId);
@@ -88,7 +88,7 @@ export async function fetchActivities({ date, userId } = {}) {
   if (error) console.error('fetchActivities:', error.message);
   return { activities: data || [] };
 }
-
+ 
 export async function fetchAllActivities({ userId } = {}) {
   const { data, error } = await supabase.from('activities').select('*')
     .not('agent_id', 'eq', 'demo').eq('user_id', userId)
@@ -96,19 +96,19 @@ export async function fetchAllActivities({ userId } = {}) {
   if (error) console.error('fetchAllActivities:', error.message);
   return { activities: data || [] };
 }
-
+ 
 export async function patchActivity(id, updates) {
   const { error } = await supabase.from('activities').update(updates).eq('id', id);
   if (error) console.error('patchActivity:', error.message);
   return { error };
 }
-
+ 
 export async function patchActivityMatter(id, matter) {
   const { error } = await supabase.from('activities').update({ matter }).eq('id', id);
   if (error) console.error('patchActivityMatter:', error.message);
   return { error };
 }
-
+ 
 // ── Matters ───────────────────────────────────────────────────────────
 export async function fetchMatters(userId) {
   let q = supabase.from('matters').select('*').order('created_at', { ascending: false });
@@ -117,7 +117,7 @@ export async function fetchMatters(userId) {
   if (error) console.error('fetchMatters:', error.message);
   return { matters: data || [] };
 }
-
+ 
 export async function createMatter({ id, name, client, description, userId }) {
   const matterId = id.trim().toUpperCase();
   const { data: existing } = await supabase.from('matters').select('id').eq('id', matterId).eq('user_id', userId);
@@ -131,14 +131,14 @@ export async function createMatter({ id, name, client, description, userId }) {
   if (error) console.error('createMatter:', error.message);
   return { data: data?.[0] || null, error };
 }
-
+ 
 export async function deleteMatter(id) {
   await supabase.from('activities').update({ matter: '' }).eq('matter', id);
   const { error } = await supabase.from('matters').delete().eq('id', id);
   if (error) console.error('deleteMatter:', error.message);
   return { error };
 }
-
+ 
 // ── Invoices ──────────────────────────────────────────────────────────
 export async function fetchInvoices(userId) {
   let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
@@ -147,7 +147,7 @@ export async function fetchInvoices(userId) {
   if (error) console.error('fetchInvoices:', error.message);
   return { invoices: data || [] };
 }
-
+ 
 export async function saveInvoice(invoice, userId) {
   try {
     const ts  = Date.now().toString().slice(-6);
@@ -174,13 +174,13 @@ export async function saveInvoice(invoice, userId) {
     return { data: null, error: { message: e.message } };
   }
 }
-
+ 
 export async function deleteInvoice(id) {
   const { error } = await supabase.from('invoices').delete().eq('id', id);
   if (error) console.error('deleteInvoice:', error.message);
   return { error };
 }
-
+ 
 // ── History ───────────────────────────────────────────────────────────
 export async function fetchHistory(year, userId) {
   const { data } = await supabase.from('activities').select('date, duration_seconds, is_billable, billing_units')
@@ -201,7 +201,7 @@ export async function fetchHistory(year, userId) {
   });
   return { months: Object.values(months) };
 }
-
+ 
 export async function fetchMonthActivities(month, userId) {
   const { data } = await supabase.from('activities').select('*')
     .eq('user_id', userId).neq('agent_id', 'demo')
@@ -209,7 +209,7 @@ export async function fetchMonthActivities(month, userId) {
     .order('start_time', { ascending: true });
   return { activities: data || [] };
 }
-
+ 
 // ── Manager ───────────────────────────────────────────────────────────
 export async function fetchManagerSummary(date) {
   const { data } = await supabase.from('manager_summary').select('*').eq('date', date);
@@ -218,7 +218,7 @@ export async function fetchManagerSummary(date) {
   ).neq('agent_id', 'demo');
   return { summary: data || [], allTime: allTime || [] };
 }
-
+ 
 export async function fetchAllProfiles() {
   const { data, error } = await supabase
     .from('profiles')
@@ -227,7 +227,7 @@ export async function fetchAllProfiles() {
   if (error) console.error('fetchAllProfiles:', error.message);
   return { profiles: data || [] };
 }
-
+ 
 // ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
@@ -244,3 +244,4 @@ export async function searchAll(query, userId) {
     invoices:   (invoicesRes.data|| []).filter(i => match(i.client) || match(i.matter_name) || match(i.id)),
   };
 }
+ 

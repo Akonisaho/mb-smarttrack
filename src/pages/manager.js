@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices } from '../lib/supabase';
- 
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, inviteStaff } from '../lib/supabase';
+
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function pct(a,b){ return b>0?Math.round((a/b)*100):0; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
 function fmonth(m){ try{return new Date(m+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'});}catch{return m;} }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 function fmtDate(d){ if(!d)return''; try{ const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }catch{return d;} }
- 
+
 function BarChart({data,height=120}){
   if(!data||!data.length) return <div style={{height,display:'flex',alignItems:'center',justifyContent:'center',color:'#333',fontSize:12}}>No data</div>;
   const max=Math.max(...data.map(d=>d.value),1);
@@ -25,49 +25,53 @@ function BarChart({data,height=120}){
     </div>
   );
 }
- 
+
 export default function Manager() {
   const router = useRouter();
-  const [profile,setProfile]         = useState(null);
-  const [loading,setLoading]         = useState(true);
-  const [tab,setTab]                 = useState('overview');
+  const [profile,setProfile]             = useState(null);
+  const [loading,setLoading]             = useState(true);
+  const [tab,setTab]                     = useState('overview');
   const todayStr = new Date().toLocaleDateString('en-CA');
-  const [selDate,setSelDate]         = useState(todayStr);
-  const [summary,setSummary]         = useState([]);
-  const [profiles,setProfiles]       = useState([]);
-  const [invoices,setInvoices]       = useState([]);
-  const [allTime,setAllTime]         = useState([]);
-  const [selAtty,setSelAtty]         = useState('all');
-  const [selBranch,setSelBranch]     = useState('all');
-  const [branches,setBranches]       = useState([]);
-  const [clock,setClock]             = useState('');
-  const [rate,setRate]               = useState(150);
-  const [histYear,setHistYear]       = useState(new Date().getFullYear());
-  const [histData,setHistData]       = useState([]);
-  const [selMonth,setSelMonth]       = useState(null);
-  const [monthActs,setMonthActs]     = useState([]);
-  const [trustTxns,setTrustTxns]     = useState([]);
+  const [selDate,setSelDate]             = useState(todayStr);
+  const [summary,setSummary]             = useState([]);
+  const [profiles,setProfiles]           = useState([]);
+  const [invoices,setInvoices]           = useState([]);
+  const [allTime,setAllTime]             = useState([]);
+  const [selAtty,setSelAtty]             = useState('all');
+  const [selBranch,setSelBranch]         = useState('all');
+  const [branches,setBranches]           = useState([]);
+  const [clock,setClock]                 = useState('');
+  const [rate,setRate]                   = useState(150);
+  const [histYear,setHistYear]           = useState(new Date().getFullYear());
+  const [histData,setHistData]           = useState([]);
+  const [selMonth,setSelMonth]           = useState(null);
+  const [monthActs,setMonthActs]         = useState([]);
+  const [trustTxns,setTrustTxns]         = useState([]);
   const [trustBalances,setTrustBalances] = useState({});
   const [pendingPayments,setPendingPayments] = useState([]);
-  const [trustAlert,setTrustAlert]   = useState({msg:'',type:''});
-  const [matters,setMatters]         = useState([]);
- 
+  const [trustAlert,setTrustAlert]       = useState({msg:'',type:''});
+  const [matters,setMatters]             = useState([]);
+  const [showInvite,setShowInvite]       = useState(false);
+  const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:'',tempPassword:''});
+  const [inviting,setInviting]           = useState(false);
+  const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
+
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
     return()=>clearInterval(t);
   },[]);
- 
+
   useEffect(()=>{
     supabase.auth.getSession().then(async({data})=>{
       if(!data.session){ router.replace('/login'); return; }
       const p = await getProfile(data.session.user.id);
-      const isManager = p?.role==='manager'||data.session.user.email==='livhuwaningwn@gmail.com';
+      const isManager = p?.role==='manager'||p?.role==='national_manager'||p?.role==='branch_manager'||data.session.user.email==='livhuwaningwn@gmail.com';
       if(!isManager){ router.replace('/'); return; }
       setProfile(p||{full_name:data.session.user.email,role:'manager'});
       setLoading(false);
     });
   },[]);
- 
+
   const load = useCallback(async()=>{
     const [sumRes,profRes,invRes,branchRes,trustRes,matRes] = await Promise.all([
       fetchManagerSummary(selDate),
@@ -81,7 +85,8 @@ export default function Manager() {
     if(sumRes.allTime)   setAllTime(sumRes.allTime);
     if(profRes.profiles) setProfiles(profRes.profiles);
     if(invRes.invoices)  setInvoices(invRes.invoices||[]);
-    setBranches(branchRes.data||[]);
+    const br=branchRes.data||[];
+    setBranches(br);
     setMatters(matRes.data||[]);
     const txns=trustRes.data||[];
     setTrustTxns(txns);
@@ -94,9 +99,9 @@ export default function Manager() {
     });
     setTrustBalances(bals);
   },[selDate]);
- 
+
   useEffect(()=>{ if(!loading){ load(); const t=setInterval(load,30000); return()=>clearInterval(t); } },[loading,load]);
- 
+
   useEffect(()=>{
     if(tab!=='history') return;
     const fetchHist=async()=>{
@@ -121,7 +126,7 @@ export default function Manager() {
     };
     fetchHist();
   },[tab,histYear]);
- 
+
   const loadMonth=async(month,attyId)=>{
     setSelMonth(month);
     let q=supabase.from('activities').select('*, profiles(full_name)')
@@ -132,13 +137,27 @@ export default function Manager() {
     const {data}=await q;
     setMonthActs(data||[]);
   };
- 
+
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),6000); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
- 
-  // Filter by branch
+  async function removeStaff(userId,name){ if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return; const {error}=await supabase.from('profiles').delete().eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ ${name} removed.`,'success'); load(); }
+
+  async function handleInvite(){
+    if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
+    setInviting(true);
+    setInviteMsg({msg:'',type:''});
+    const {error}=await inviteStaff(inviteForm);
+    if(error){ setInviteMsg({msg:'Error: '+error.message,type:'error'}); setInviting(false); return; }
+    const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
+    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Share their temporary password: ${inviteForm.tempPassword}`,'success');
+    setInviting(false);
+    setShowInvite(false);
+    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||'',tempPassword:''});
+    load();
+  }
+
   const filteredProfiles = selBranch==='all' ? profiles : profiles.filter(p=>p.branch_id===selBranch);
   const filtered = selAtty==='all' ? summary : summary.filter(s=>s.user_id===selAtty);
   const filteredAllTime = selAtty==='all' ? allTime : allTime.filter(a=>a.user_id===selAtty);
@@ -151,7 +170,7 @@ export default function Manager() {
   const unbilledUnits  = Math.max(0,firmAllUnits-billedUnits);
   const unbilledRev    = unbilledUnits*rate;
   const totalTrustHeld = Object.values(trustBalances).reduce((s,v)=>s+v,0);
- 
+
   const byAtty=filteredProfiles.map(p=>{
     const allTimeP=allTime.filter(a=>a.user_id===p.id);
     const attyInvs=invoices.filter(i=>i.user_id===p.id);
@@ -169,7 +188,7 @@ export default function Manager() {
       invoiceCount:attyInvs.length,
     };
   }).sort((a,b)=>b.all_units-a.all_units);
- 
+
   const matterMap={};
   filtInvoices.forEach(inv=>{
     const key=inv.matter_id||inv.matter_name||'Unknown';
@@ -178,15 +197,14 @@ export default function Manager() {
     matterMap[key].billedAmt+=(inv.total_units||0)*(inv.rate||150);
   });
   const topMatters=Object.values(matterMap).sort((a,b)=>b.billedAmt-a.billedAmt).slice(0,10);
- 
+
   const monthBars=histData.filter(m=>m.sessions>0).map(m=>({
     label:new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'short'}),
     label2:`${m.billable_units}u`,
     value:m.billable_units,
     color:m.billable_units>0?'#8DC63F':'#2E4A6E'
   }));
- 
-  // Branch trust overview
+
   const branchTrustData=branches.map(b=>{
     const bTxns=trustTxns.filter(t=>t.branch_id===b.id&&t.status==='posted');
     const bBal=bTxns.reduce((s,t)=>t.type==='receipt'?s+Number(t.amount):s-Number(t.amount),0);
@@ -194,7 +212,13 @@ export default function Manager() {
     const bP=bTxns.filter(t=>t.type==='payment').reduce((s,t)=>s+Number(t.amount),0);
     return{...b,balance:bBal,receipts:bR,payments:bP,txnCount:bTxns.length};
   });
- 
+
+  const roleColor=(role)=>role==='manager'||role==='national_manager'?'#A78BFA':role==='branch_manager'?'#4A90D9':role==='bookkeeper'?'#EAB308':'#8DC63F';
+  const roleBg=(role)=>role==='manager'||role==='national_manager'?'rgba(167,139,250,0.1)':role==='branch_manager'?'rgba(74,144,217,0.1)':role==='bookkeeper'?'rgba(234,179,8,0.1)':'rgba(141,198,63,0.1)';
+
+  const inp={background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'10px 14px',borderRadius:7,fontSize:13,fontFamily:"'DM Sans',system-ui,sans-serif",width:'100%'};
+  const lbl={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};
+
   const C={
     page:  {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0'},
     hdr:   {background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
@@ -208,11 +232,10 @@ export default function Manager() {
     pill:  {display:'flex',alignItems:'center',gap:6,background:'rgba(141,198,63,0.08)',border:'1px solid rgba(141,198,63,0.2)',borderRadius:20,padding:'4px 12px',fontSize:11,color:'#8DC63F'},
     dot:   {width:7,height:7,borderRadius:'50%',background:'#8DC63F',boxShadow:'0 0 6px rgba(141,198,63,0.8)'},
     ntab:  (on)=>({background:'transparent',border:`1px solid ${on?'#2A2A2A':'transparent'}`,color:on?'#F0F0F0':'#555',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:on?600:400}),
-    btab:  (on)=>({background:on?'rgba(141,198,63,0.1)':'transparent',border:`1px solid ${on?'rgba(141,198,63,0.4)':'#252525'}`,color:on?'#8DC63F':'#555',padding:'5px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:on?600:400}),
   };
- 
+
   if(loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
- 
+
   return(
     <>
       <Head><title>MB SmartTrack — Manager</title></Head>
@@ -227,14 +250,16 @@ export default function Manager() {
         select option{background:#1A1A1A;color:#F0F0F0}
         input[type=date]{color-scheme:dark}
         button:hover{opacity:.85}
+        .mb-inp{background:#1A1A1A;border:1px solid #252525;color:#F0F0F0;padding:10px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',system-ui,sans-serif;width:100%;display:block;}
+        .mb-inp:focus{outline:1px solid rgba(141,198,63,0.5);border-color:rgba(141,198,63,0.4);}
+        .mb-inp option{background:#1A1A1A;color:#F0F0F0;}
       `}</style>
       <div style={C.page}>
- 
+
         {/* Header */}
         <div style={C.hdr}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <img src="/logo.png" alt="MB" style={{width:34,height:34,objectFit:'contain',borderRadius:6}}
-              onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
+            <img src="/logo.png" alt="MB" style={{width:34,height:34,objectFit:'contain',borderRadius:6}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
             <div style={{display:'none',background:'#8DC63F',borderRadius:6,width:34,height:34,alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:'#0A0A0A',letterSpacing:'-0.05em'}}>MB</div>
             <div>
               <div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack — Manager</div>
@@ -254,7 +279,7 @@ export default function Manager() {
             <button style={{...C.btn('r')}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           </div>
         </div>
- 
+
         {/* Alert banner */}
         {trustAlert.msg&&(
           <div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'10px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}>
@@ -262,7 +287,7 @@ export default function Manager() {
             <button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button>
           </div>
         )}
- 
+
         {/* Pending payments banner */}
         {pendingPayments.length>0&&tab!=='trust'&&(
           <div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -270,14 +295,14 @@ export default function Manager() {
             <button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review approvals →</button>
           </div>
         )}
- 
+
         {/* ══ OVERVIEW ══════════════════════════════════════════ */}
         {tab==='overview'&&(
           <div style={C.main}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
               <div>
                 <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div>
-                <div style={{fontSize:11,color:'#444'}}>{fdate(selDate)} · {profiles.length} staff · 3 branches</div>
+                <div style={{fontSize:11,color:'#444'}}>{fdate(selDate)} · {profiles.length} staff · {branches.length} branches</div>
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
                 <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
@@ -297,14 +322,13 @@ export default function Manager() {
                 </select>
               </div>
             </div>
- 
-            {/* Key stats */}
+
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
               {[
                 {l:'Total Time Tracked',v:toHm(firmTotalSec),s:`${toHm(firmBillSec)} billable`,a:false,w:false},
                 {l:'Billed Revenue',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`,a:true,w:false},
                 {l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`,a:false,w:true},
-                {l:'Total Trust Held',v:fmtR(totalTrustHeld),s:`${pendingPayments.length} payment${pendingPayments.length===1?'':' s'} pending`,a:false,w:false},
+                {l:'Total Trust Held',v:fmtR(totalTrustHeld),s:`${pendingPayments.length} payment${pendingPayments.length===1?'':'s'} pending`,a:false,w:false},
               ].map(({l,v,s,a,w})=>(
                 <div key={l} style={C.stat(a,w)}>
                   <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
@@ -313,8 +337,7 @@ export default function Manager() {
                 </div>
               ))}
             </div>
- 
-            {/* Branch overview */}
+
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
               {branchTrustData.map(b=>(
                 <div key={b.id} style={{...C.card,marginBottom:0}}>
@@ -332,8 +355,7 @@ export default function Manager() {
                 </div>
               ))}
             </div>
- 
-            {/* Attorney leaderboard */}
+
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Leaderboard — All Time</div>
               <div style={{overflowX:'auto'}}>
@@ -358,24 +380,14 @@ export default function Manager() {
                 </table>
               </div>
             </div>
- 
-            {/* Top matters + recent invoices */}
+
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
               <div style={C.card}>
                 <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Top Matters by Billed Revenue</div>
                 {!topMatters.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:(
                   <table style={{width:'100%',borderCollapse:'collapse'}}>
                     <thead><tr>{['Matter ID','Client','Invoices','Billed (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                    <tbody>
-                      {topMatters.map((m,i)=>(
-                        <tr key={i}>
-                          <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td>
-                          <td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td>
-                          <td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td>
-                          <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                    <tbody>{topMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td></tr>))}</tbody>
                   </table>
                 )}
               </div>
@@ -384,16 +396,7 @@ export default function Manager() {
                 {!filtInvoices.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:(
                   <table style={{width:'100%',borderCollapse:'collapse'}}>
                     <thead><tr>{['Invoice','Client','Period','Incl. VAT'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                    <tbody>
-                      {filtInvoices.slice(0,8).map(inv=>(
-                        <tr key={inv.id}>
-                          <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
-                          <td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td>
-                          <td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td>
-                          <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                    <tbody>{filtInvoices.slice(0,8).map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}</tbody>
                   </table>
                 )}
               </div>
@@ -401,36 +404,24 @@ export default function Manager() {
             <div style={{marginTop:14,textAlign:'center',fontSize:11,color:'#252525'}}>Motsoeneng Bill · MB SmartTrack Manager View · Activity details are private to each attorney</div>
           </div>
         )}
- 
+
         {/* ══ TRUST ══════════════════════════════════════════════ */}
         {tab==='trust'&&(
           <div style={C.main}>
             <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Trust Accounting</div>
             <div style={{fontSize:11,color:'#444',marginBottom:16}}>All branches · Legal Practice Act compliant</div>
- 
-            {/* Trust stats */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
               {[
-                {l:'Total trust held',v:fmtR(totalTrustHeld),a:true},
-                {l:'Total receipts',v:fmtR(trustTxns.filter(t=>t.type==='receipt'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false},
-                {l:'Total payments',v:fmtR(trustTxns.filter(t=>t.type==='payment'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false},
+                {l:'Total trust held',v:fmtR(totalTrustHeld),a:true,w:false},
+                {l:'Total receipts',v:fmtR(trustTxns.filter(t=>t.type==='receipt'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},
+                {l:'Total payments',v:fmtR(trustTxns.filter(t=>t.type==='payment'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},
                 {l:'Pending approvals',v:pendingPayments.length,a:false,w:pendingPayments.length>0},
-              ].map(({l,v,a,w})=>(
-                <div key={l} style={C.stat(a,w)}>
-                  <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
-                  <div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div>
-                </div>
-              ))}
+              ].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
             </div>
- 
-            {/* Branch trust balances */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
               {branchTrustData.map(b=>(
                 <div key={b.id} style={{...C.card,marginBottom:0,border:selBranch===b.id?'1px solid rgba(141,198,63,0.4)':'1px solid #1A1A1A',cursor:'pointer'}} onClick={()=>setSelBranch(selBranch===b.id?'all':b.id)}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div>
-                    <div style={{fontSize:16,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div>
-                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:16,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div>
                   <div style={{fontSize:10,color:'#555',marginBottom:8}}>{b.address}</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,fontSize:11}}>
                     <div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Receipts</div><div style={{color:'#8DC63F'}}>{fmtR(b.receipts)}</div></div>
@@ -439,172 +430,74 @@ export default function Manager() {
                 </div>
               ))}
             </div>
- 
-            {/* Pending approvals */}
             <div style={C.card}>
-              <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>
-                Payment approvals
-                {pendingPayments.length>0&&<span style={{marginLeft:8,background:'rgba(234,179,8,0.15)',color:'#EAB308',fontSize:10,padding:'2px 10px',borderRadius:20,border:'1px solid rgba(234,179,8,0.3)'}}>{pendingPayments.length} pending</span>}
-              </div>
-              {!pendingPayments.length?(
-                <div style={{textAlign:'center',padding:'30px',color:'#555'}}>
-                  <div style={{fontSize:24,marginBottom:8}}>✅</div>
-                  <div style={{fontSize:12}}>No payments pending approval</div>
-                </div>
-              ):pendingPayments.map((t,i)=>{
-                const m=matters.find(x=>x.id===t.matter_id);
-                const br=branches.find(b=>b.id===t.branch_id);
-                const bal=trustBalances[t.matter_id]||0;
-                return(
-                  <div key={i} style={{border:'1px solid rgba(234,179,8,0.3)',borderRadius:8,padding:16,marginBottom:10}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
-                          <span style={{fontSize:9,background:'rgba(234,179,8,0.1)',color:'#EAB308',border:'1px solid rgba(234,179,8,0.3)',padding:'2px 10px',borderRadius:20,fontWeight:600}}>PENDING APPROVAL</span>
-                          <span style={{fontSize:10,color:'#555'}}>{fmtDate(t.date)}</span>
-                          {br&&<span style={{fontSize:10,color:'#555',border:'1px solid #252525',padding:'1px 8px',borderRadius:20}}>{br.name}</span>}
-                        </div>
-                        <div style={{fontSize:20,fontWeight:700,color:'#EAB308',marginBottom:6}}>{fmtR(t.amount)}</div>
-                        <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Payee: <strong>{t.payee}</strong></div>
-                        <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Matter: <span style={{color:'#A78BFA'}}>{t.matter_id}</span> — {m?.client||'—'}</div>
-                        <div style={{fontSize:11,color:'#555',marginBottom:8}}>{t.narration}</div>
-                        <div style={{background:'rgba(234,179,8,0.05)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'#888'}}>
-                          Available balance: <strong style={{color:'#8DC63F'}}>{fmtR(bal)}</strong> · After approval: <strong style={{color:bal-Number(t.amount)>=0?'#8DC63F':'#E05252'}}>{fmtR(bal-Number(t.amount))}</strong>
-                        </div>
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:140}}>
-                        <button style={C.btn('p')} onClick={()=>{ if(confirm(`Approve payment of ${fmtR(t.amount)} to ${t.payee}?`)) approvePayment(t.id); }}>✓ Approve</button>
-                        <button style={C.btn('r')} onClick={()=>{ const r=prompt('Reason for rejection:'); if(r!==null) rejectPayment(t.id,r); }}>✗ Reject</button>
-                      </div>
+              <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Payment approvals {pendingPayments.length>0&&<span style={{marginLeft:8,background:'rgba(234,179,8,0.15)',color:'#EAB308',fontSize:10,padding:'2px 10px',borderRadius:20,border:'1px solid rgba(234,179,8,0.3)'}}>{pendingPayments.length} pending</span>}</div>
+              {!pendingPayments.length?(<div style={{textAlign:'center',padding:'30px',color:'#555'}}><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:12}}>No payments pending approval</div></div>):pendingPayments.map((t,i)=>{
+                const m=matters.find(x=>x.id===t.matter_id),br=branches.find(b=>b.id===t.branch_id),bal=trustBalances[t.matter_id]||0;
+                return(<div key={i} style={{border:'1px solid rgba(234,179,8,0.3)',borderRadius:8,padding:16,marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}><span style={{fontSize:9,background:'rgba(234,179,8,0.1)',color:'#EAB308',border:'1px solid rgba(234,179,8,0.3)',padding:'2px 10px',borderRadius:20,fontWeight:600}}>PENDING APPROVAL</span><span style={{fontSize:10,color:'#555'}}>{fmtDate(t.date)}</span>{br&&<span style={{fontSize:10,color:'#555',border:'1px solid #252525',padding:'1px 8px',borderRadius:20}}>{br.name}</span>}</div>
+                      <div style={{fontSize:20,fontWeight:700,color:'#EAB308',marginBottom:6}}>{fmtR(t.amount)}</div>
+                      <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Payee: <strong>{t.payee}</strong></div>
+                      <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Matter: <span style={{color:'#A78BFA'}}>{t.matter_id}</span> — {m?.client||'—'}</div>
+                      <div style={{fontSize:11,color:'#555',marginBottom:8}}>{t.narration}</div>
+                      <div style={{background:'rgba(234,179,8,0.05)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'#888'}}>Available balance: <strong style={{color:'#8DC63F'}}>{fmtR(bal)}</strong> · After approval: <strong style={{color:bal-Number(t.amount)>=0?'#8DC63F':'#E05252'}}>{fmtR(bal-Number(t.amount))}</strong></div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:140}}>
+                      <button style={C.btn('p')} onClick={()=>{ if(confirm(`Approve payment of ${fmtR(t.amount)} to ${t.payee}?`)) approvePayment(t.id); }}>✓ Approve</button>
+                      <button style={C.btn('r')} onClick={()=>{ const r=prompt('Reason for rejection:'); if(r!==null) rejectPayment(t.id,r); }}>✗ Reject</button>
                     </div>
                   </div>
-                );
+                </div>);
               })}
             </div>
- 
-            {/* Trust ledger summary per matter */}
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Trust balances — all matters</div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr>{['Matter ID','Client','Branch','Trust Balance'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {!matters.length&&<tr><td colSpan={4} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No matters yet</td></tr>}
-                    {matters.map(m=>{
-                      const bal=trustBalances[m.id]||0;
-                      const br=branches.find(b=>b.id===m.branch_id);
-                      return(
-                        <tr key={m.id} style={{opacity:bal===0?0.4:1}}>
-                          <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.id}</td>
-                          <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{m.client}</td>
-                          <td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td>
-                          <td style={{...C.td,fontFamily:'monospace',fontWeight:700,textAlign:'right',color:bal>0?'#8DC63F':bal<0?'#E05252':'#555'}}>{fmtR(bal)}</td>
-                        </tr>
-                      );
-                    })}
-                    <tr style={{background:'#0D0D0D'}}>
-                      <td colSpan={3} style={{...C.th,paddingTop:12}}>Grand total</td>
-                      <td style={{...C.th,fontFamily:'monospace',fontSize:13,color:'#8DC63F',textAlign:'right',paddingTop:12}}>{fmtR(totalTrustHeld)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Branch','Trust Balance'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+                {!matters.length&&<tr><td colSpan={4} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No matters yet</td></tr>}
+                {matters.map(m=>{ const bal=trustBalances[m.id]||0,br=branches.find(b=>b.id===m.branch_id); return(<tr key={m.id} style={{opacity:bal===0?0.4:1}}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.id}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{m.client}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,textAlign:'right',color:bal>0?'#8DC63F':bal<0?'#E05252':'#555'}}>{fmtR(bal)}</td></tr>); })}
+                <tr style={{background:'#0D0D0D'}}><td colSpan={3} style={{...C.th,paddingTop:12}}>Grand total</td><td style={{...C.th,fontFamily:'monospace',fontSize:13,color:'#8DC63F',textAlign:'right',paddingTop:12}}>{fmtR(totalTrustHeld)}</td></tr>
+              </tbody></table></div>
             </div>
           </div>
         )}
- 
+
         {/* ══ ANALYTICS ═══════════════════════════════════════════ */}
         {tab==='analytics'&&(
           <div style={C.main}>
             <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>Firm Analytics</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-              {[
-                {l:'Total Attorneys',v:profiles.length,s:'across all branches'},
-                {l:'Total Units (All Time)',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},
-                {l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},
-                {l:'Total Unbilled',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units pending`},
-              ].map(({l,v,s})=>(
-                <div key={l} style={C.stat(false,false)}>
-                  <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
-                  <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>{v}</div>
-                  <div style={{fontSize:10,color:'#444'}}>{s}</div>
-                </div>
-              ))}
+              {[{l:'Total Staff',v:profiles.length,s:'across all branches'},{l:'Total Units (All Time)',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},{l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},{l:'Total Unbilled',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units pending`}].map(({l,v,s})=>(<div key={l} style={C.stat(false,false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
             </div>
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance — All Time</div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr>{['Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Est. Unbilled Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {byAtty.map(a=>(
-                    <tr key={a.id}>
-                      <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td>
-                      <td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                <tbody>{byAtty.map(a=>(<tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td></tr>))}</tbody>
               </table>
             </div>
           </div>
         )}
- 
+
         {/* ══ HISTORY ═════════════════════════════════════════════ */}
         {tab==='history'&&(
           <div style={C.main}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
               <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>All attorneys · {histYear}</div></div>
               <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);}}>
-                  {[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
-                </select>
-                <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}>
-                  <option value="all">All attorneys</option>
-                  {profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </select>
+                <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
+                <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
               </div>
             </div>
             {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-              {histData.map(m=>{
-                const isSelected=selMonth===m.month;
-                const hasFuture=new Date(m.month+'-01')>new Date();
-                return(
-                  <div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}>
-                    <div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>
-                    {m.sessions?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#8DC63F':'#888',marginBottom:2}}>{toHm(m.total_seconds)}</div><div style={{fontSize:10,color:'#555'}}>{m.sessions} sessions</div><div style={{fontSize:11,color:'#8DC63F',marginTop:4,fontWeight:600}}>{m.billable_units} units</div><div style={{fontSize:9,color:'#444'}}>R{(m.billable_units*rate).toLocaleString()} est.</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}
-                  </div>
-                );
-              })}
+              {histData.map(m=>{ const isSelected=selMonth===m.month,hasFuture=new Date(m.month+'-01')>new Date(); return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}><div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>{m.sessions?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#8DC63F':'#888',marginBottom:2}}>{toHm(m.total_seconds)}</div><div style={{fontSize:10,color:'#555'}}>{m.sessions} sessions</div><div style={{fontSize:11,color:'#8DC63F',marginTop:4,fontWeight:600}}>{m.billable_units} units</div><div style={{fontSize:9,color:'#444'}}>R{(m.billable_units*rate).toLocaleString()} est.</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}</div>); })}
             </div>
-            {selMonth&&monthActs.length>0&&(
-              <div style={C.card}>
-                <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>{fmonth(selMonth)} · {monthActs.length} sessions</div>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr>{['Date','Attorney','Application','Duration','Units','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {monthActs.filter(a=>a.is_billable).map(a=>(
-                      <tr key={a.id}>
-                        <td style={{...C.td,fontSize:10,color:'#555',fontFamily:'monospace'}}>{a.date}</td>
-                        <td style={{...C.td,color:'#C8C8C8'}}>{a.profiles?.full_name||'—'}</td>
-                        <td style={{...C.td,color:'#888'}}>{a.app_display_name}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.duration_seconds)}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{a.billing_units}</td>
-                        <td style={C.td}><span style={{color:'#8DC63F',fontSize:9,padding:'2px 8px',border:'1px solid rgba(141,198,63,0.3)',borderRadius:20}}>Billable</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {selMonth&&monthActs.length>0&&(<div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>{fmonth(selMonth)} · {monthActs.length} sessions</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Attorney','Application','Duration','Units','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{monthActs.filter(a=>a.is_billable).map(a=>(<tr key={a.id}><td style={{...C.td,fontSize:10,color:'#555',fontFamily:'monospace'}}>{a.date}</td><td style={{...C.td,color:'#C8C8C8'}}>{a.profiles?.full_name||'—'}</td><td style={{...C.td,color:'#888'}}>{a.app_display_name}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.duration_seconds)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{a.billing_units}</td><td style={C.td}><span style={{color:'#8DC63F',fontSize:9,padding:'2px 8px',border:'1px solid rgba(141,198,63,0.3)',borderRadius:20}}>Billable</span></td></tr>))}</tbody></table></div>)}
           </div>
         )}
- 
+
         {/* ══ INVOICES ════════════════════════════════════════════ */}
         {tab==='invoices'&&(
           <div style={C.main}>
@@ -614,69 +507,133 @@ export default function Manager() {
                 <thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {!filtInvoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}
-                  {filtInvoices.map(inv=>(
-                    <tr key={inv.id}>
-                      <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
-                      <td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td>
-                      <td style={{...C.td,color:'#777'}}>{inv.attorney}</td>
-                      <td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td>
-                      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td>
-                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {filtInvoices.length>0&&(
-                    <tr style={{background:'rgba(141,198,63,0.05)'}}>
-                      <td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td>
-                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td>
-                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td>
-                    </tr>
-                  )}
+                  {filtInvoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}
+                  {filtInvoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td></tr>)}
                 </tbody>
               </table>
             </div>
           </div>
         )}
- 
+
         {/* ══ STAFF ═══════════════════════════════════════════════ */}
         {tab==='staff'&&(
           <div style={C.main}>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Staff Management</div>
-            <div style={{fontSize:11,color:'#444',marginBottom:16}}>Assign attorneys to branches — changes take effect immediately</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Staff Management</div>
+                <div style={{fontSize:11,color:'#444',marginTop:2}}>{profiles.length} staff members · {branches.length} branches · No IT needed</div>
+              </div>
+              <button style={C.btn('p')} onClick={()=>{ setShowInvite(true); setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||'',tempPassword:''}); setInviteMsg({msg:'',type:''}); }}>+ Add Staff Member</button>
+            </div>
+
+            {/* Staff table */}
             <div style={C.card}>
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>{['Name','Email','Role','Current Branch','Assign Branch'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {!profiles.length&&<tr><td colSpan={5} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet</td></tr>}
-                  {profiles.map(p=>{
-                    const br=branches.find(b=>b.id===p.branch_id);
-                    return(
-                      <tr key={p.id}>
-                        <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}</td>
-                        <td style={{...C.td,fontSize:10,color:'#555'}}>{p.email}</td>
-                        <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:p.role==='manager'?'rgba(167,139,250,0.1)':p.role==='bookkeeper'?'rgba(74,144,217,0.1)':'rgba(141,198,63,0.1)',color:p.role==='manager'?'#A78BFA':p.role==='bookkeeper'?'#4A90D9':'#8DC63F'}}>{p.role||'attorney'}</span></td>
-                        <td style={{...C.td,fontSize:10,color:'#4A90D9'}}>{br?.name||<span style={{color:'#555'}}>Not assigned</span>}</td>
-                        <td style={C.td}>
-                          <select
-                            style={{...C.sel,fontSize:11}}
-                            value={p.branch_id||''}
-                            onChange={e=>assignBranch(p.id,e.target.value)}
-                          >
-                            <option value="">— select branch —</option>
-                            {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-                          </select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All staff</div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr>{['Name','Email','Role','Branch','Change Branch','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {!profiles.length&&<tr><td colSpan={6} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet — click Add Staff Member to get started</td></tr>}
+                    {profiles.map(p=>{
+                      const br=branches.find(b=>b.id===p.branch_id);
+                      return(
+                        <tr key={p.id}>
+                          <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}</td>
+                          <td style={{...C.td,fontSize:10,color:'#555'}}>{p.email||'—'}</td>
+                          <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td>
+                          <td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td>
+                          <td style={C.td}>
+                            <select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}>
+                              <option value="">— select —</option>
+                              {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                          </td>
+                          <td style={C.td}>
+                            <button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Branch staff summary */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+              {branches.map(b=>{
+                const bStaff=profiles.filter(p=>p.branch_id===b.id);
+                return(
+                  <div key={b.id} style={C.card}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{b.name}</div>
+                    <div style={{fontSize:10,color:'#555',marginBottom:10}}>{b.address}</div>
+                    <div style={{fontSize:22,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{bStaff.length}</div>
+                    <div style={{fontSize:10,color:'#555',marginBottom:10}}>staff members</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      {bStaff.map(s=>(
+                        <div key={s.id} style={{fontSize:11,color:'#888',display:'flex',alignItems:'center',gap:6}}>
+                          <span style={{width:6,height:6,borderRadius:'50%',background:roleColor(s.role),display:'inline-block',flexShrink:0}}/>
+                          <span>{s.full_name}</span>
+                          <span style={{fontSize:9,color:'#444'}}>({s.role||'attorney'})</span>
+                        </div>
+                      ))}
+                      {!bStaff.length&&<div style={{fontSize:11,color:'#333'}}>No staff assigned</div>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
- 
+
+        {/* ══ INVITE MODAL ════════════════════════════════════════ */}
+        {showInvite&&(
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowInvite(false)}>
+            <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:32,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',marginBottom:4}}>Add Staff Member</div>
+              <div style={{fontSize:11,color:'#555',marginBottom:24}}>Create an account for a new attorney, manager or bookkeeper. Share their temporary password with them — they can change it after logging in.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                <div>
+                  <label style={lbl}>Full name *</label>
+                  <input className="mb-inp" type="text" placeholder="e.g. Adv. Sarah Nkosi" value={inviteForm.fullName} onChange={e=>setInviteForm(f=>({...f,fullName:e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={lbl}>Email address *</label>
+                  <input className="mb-inp" type="email" placeholder="their@email.com" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  <div>
+                    <label style={lbl}>Role *</label>
+                    <select className="mb-inp" value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value}))}>
+                      <option value="attorney">Attorney / Fee Earner</option>
+                      <option value="branch_manager">Branch Manager</option>
+                      <option value="manager">National Manager</option>
+                      <option value="bookkeeper">Bookkeeper</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Branch *</label>
+                    <select className="mb-inp" value={inviteForm.branchId} onChange={e=>setInviteForm(f=>({...f,branchId:e.target.value}))}>
+                      <option value="">Select branch...</option>
+                      {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Temporary password *</label>
+                  <input className="mb-inp" type="text" placeholder="e.g. MB@2026! — share this with them" value={inviteForm.tempPassword} onChange={e=>setInviteForm(f=>({...f,tempPassword:e.target.value}))}/>
+                  <div style={{fontSize:10,color:'#444',marginTop:4}}>They will use this to sign in for the first time</div>
+                </div>
+                {inviteMsg.msg&&(<div style={{background:inviteMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${inviteMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:inviteMsg.type==='error'?'#E05252':'#8DC63F'}}>{inviteMsg.msg}</div>)}
+                <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>
+                  <button style={C.btn()} onClick={()=>setShowInvite(false)}>Cancel</button>
+                  <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId||!inviteForm.tempPassword} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
