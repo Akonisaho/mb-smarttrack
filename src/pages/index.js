@@ -135,6 +135,7 @@ export default function App() {
   const [pendingPayments,setPendingPayments]=useState([]);
   const [selectedTrustMatter,setSelectedTrustMatter]=useState('');
   const [rForm,setRForm]=useState({date:today,amount:'',matterId:'',accountId:'',reference:'',receivedFrom:'',narration:'',branchId:''});
+const rFormDirty=useRef(false);
   const [pForm,setPForm]=useState({date:today,amount:'',matterId:'',accountId:'',payee:'',reference:'',narration:'',branchId:''});
   const [pBalanceCheck,setPBalanceCheck]=useState(null);
   const [tForm,setTForm]=useState({date:today,amount:'',matterId:'',fromAccountId:'',toAccount:'FNB Business',invoiceId:'',narration:'',branchId:''});
@@ -212,11 +213,11 @@ export default function App() {
       setBranches(branchRes.data||[]);
       setLockedPeriods((locksRes.data||[]).map(l=>l.period));
       setBalanceAlerts(alertsRes.data||[]);
-      if(accs.length){
-        setRForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
-        setPForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
-        setTForm(f=>f.fromAccountId?f:{...f,fromAccountId:accs[0].id});
-      }
+  if(accs.length&&!rFormDirty.current){
+  setRForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
+  setPForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
+  setTForm(f=>f.fromAccountId?f:{...f,fromAccountId:accs[0].id});
+}
       setTrustTransactions(txns);
       setPendingPayments(txns.filter(t=>t.status==='pending'));
       const bals={};
@@ -505,7 +506,7 @@ export default function App() {
       {trustTab==='receipt'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
         <div style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>New trust receipt</div><span style={{fontSize:10,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'2px 10px',borderRadius:20}}>Next: {nextReceiptNo(trustTransactions)}</span></div>
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>{isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="text" inputMode="decimal" style={C.tinp} placeholder="e.g. 10000.00" value={rForm.amount} onChange={e=>setRForm(f=>({...f,amount:e.target.value}))}/></div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={rForm.date} onChange={e=>setRForm(f=>({...f,date:e.target.value}))}/>{isLocked(rForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="text" inputMode="decimal" style={C.tinp} placeholder="e.g. 10000.00" value={rForm.amount} onChange={e=>{ rFormDirty.current=true; setRForm(f=>({...f,amount:e.target.value})); }}/></div></div>
             <div><label style={C.lbl}>Matter *</label><select style={C.tinp} value={rForm.matterId} onChange={e=>setRForm(f=>({...f,matterId:e.target.value}))}><option value="">Select matter...</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}</select></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Trust bank account</label><select style={C.tinp} value={rForm.accountId} onChange={e=>setRForm(f=>({...f,accountId:e.target.value}))}>{trustAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label style={C.lbl}>Branch</label><select style={C.tinp} value={rForm.branchId} onChange={e=>setRForm(f=>({...f,branchId:e.target.value}))}><option value="">Select branch...</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Reference</label><input style={C.tinp} placeholder="EFT ref, cheque no." value={rForm.reference} onChange={e=>setRForm(f=>({...f,reference:e.target.value}))}/></div><div><label style={C.lbl}>Received from</label><input style={C.tinp} placeholder="Payer name" value={rForm.receivedFrom} onChange={e=>setRForm(f=>({...f,receivedFrom:e.target.value}))}/></div></div>
