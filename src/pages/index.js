@@ -477,7 +477,7 @@ const rFormDirty=useRef(false);
     </div>);
   }
 
-  function TrustTab(){
+  const TrustTab=useCallback(()=>{
     const total=totalTrustHeld();
     const ledger=selectedTrustMatter?getMatterLedger(selectedTrustMatter):[];
     const systemTotal=trustTransactions.filter(t=>t.status==='posted').reduce((s,t)=>t.type==='receipt'?s+Number(t.amount):s-Number(t.amount),0);
@@ -587,7 +587,7 @@ const rFormDirty=useRef(false);
         </div>
       </div>)}
     </div>);
-  }
+  },[trustTab,trustTransactions,trustAccounts,branches,matters,rForm,pForm,tForm,trustAlert,pendingPayments,balanceAlerts,trustBalances,trustSaving,trustLoading,bankLines,matched,reconPeriod,reportType,reportFrom,reportTo,reportBranch,alertMatterId,alertMinBal,selectedTrustMatter,lockedPeriods,invoices]);
 
   if(authLoading) return <div style={{background:'#0A0A0A',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',color:'#444',fontSize:13}}>Loading...</div>;
 
