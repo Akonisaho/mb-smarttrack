@@ -4,6 +4,8 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+console.log('Service role key present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+console.log('URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
