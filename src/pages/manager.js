@@ -155,11 +155,15 @@ export default function Manager() {
     if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
     setInviting(true);
     setInviteMsg({msg:'',type:''});
-    const res = await fetch('/api/invite', {
-  method: 'POST',
-  headers: {'Content-Type':'application/json'},
-  body: JSON.stringify(inviteForm),
-});
+    const res = await fetch('/api/invite', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inviteForm)});
+    const result = await res.json();
+    if(!res.ok){setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'});setInviting(false);return;}
+    const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
+    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temp password: ${result.tempPassword||'check records'} — share via WhatsApp.`,'success');
+    setInviting(false);setShowInvite(false);
+    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
+    load();
+  }
 const result = await res.json();
 if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
 setInviting(false);
@@ -656,4 +660,4 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
       </div>
     </>
   );
-}
+
