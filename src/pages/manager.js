@@ -150,7 +150,7 @@ export default function Manager() {
     const result = await res.json();
     if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword||'see records'} — share via WhatsApp.`,'success');
+    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword||'see records'} — share this with the staff member.`,'success');
     setInviting(false);
     setShowInvite(false);
     setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
@@ -236,7 +236,13 @@ export default function Manager() {
           </div>
         </div>
 
-        {trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'10px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{trustAlert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button></div>)}
+        {trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'14px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
+  <span style={{flex:1}}>{trustAlert.msg}</span>
+  {trustAlert.type==='success'&&trustAlert.msg.includes('Temporary password:')&&(
+    <button style={{background:'rgba(141,198,63,0.2)',border:'1px solid rgba(141,198,63,0.4)',color:'#8DC63F',padding:'4px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>{ const pwd=trustAlert.msg.match(/Temporary password: ([^\s—]+)/)?.[1]; if(pwd){navigator.clipboard.writeText(pwd);} }}>📋 Copy Password</button>
+  )}
+  <button style={{background:'none',border:'none',color:'inherit',cursor:'pointer',flexShrink:0}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button>
+</div>)}
         {pendingPayments.length>0&&tab!=='trust'&&(<div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>⏳ {pendingPayments.length} trust payment{pendingPayments.length>1?'s':''} pending your approval — {fmtR(pendingPayments.reduce((s,t)=>s+Number(t.amount),0))}</span><button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review approvals →</button></div>)}
 
         {tab==='overview'&&(<div style={C.main}>
