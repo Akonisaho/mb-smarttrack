@@ -163,7 +163,9 @@ const rFormDirty=useRef(false);
       if(!data.session){ router.replace('/login'); return; }
       const u=data.session.user; setUser(u);
       const p=await getProfile(u.id); setProfile(p);
-      if(p?.role==='manager'||u.email==='livhuwaningwn@gmail.com'){ router.replace('/manager'); return; }
+      if(p?.role==='manager'||p?.role==='national_manager'||u.email==='livhuwaningwn@gmail.com'){ router.replace('/manager'); return; }
+      if(p?.role==='branch_manager'){ router.replace('/manager'); return; }
+      if(p?.role==='bookkeeper') setTab('trust');
       setAuthLoading(false);
     });
   },[]);
@@ -677,7 +679,7 @@ const rFormDirty=useRef(false);
           <div><div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack</div><div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill</div></div>
         </div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-          {[['today','Today'],['history','History'],['matters','Matters'],['analytics','Analytics'],['activities','All Activities'],['invoices','Invoice'],['archive','Archive'],['trust','🏦 Trust']].map(([v,l])=>(
+          {(profile?.role==='bookkeeper'?[['trust','🏦 Trust']]:[['today','Today'],['history','History'],['matters','Matters'],['analytics','Analytics'],['activities','All Activities'],['invoices','Invoice'],['archive','Archive'],['trust','🏦 Trust']]).map(([v,l])=>(
             <button key={v} style={{...C.ntab(tab===v),color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent',position:'relative'}} onClick={()=>setTab(v)}>
               {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
             </button>
