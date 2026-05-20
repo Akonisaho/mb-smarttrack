@@ -108,7 +108,7 @@ export async function fetchMatters(userId) {
   return { matters: data || [] };
 }
  
-export async function createMatter({ id, name, client, description, userId }) {
+export async function createMatter({ id, name, client, description, userId, branchId }) {
   const matterId = id.trim().toUpperCase();
   const { data: existing } = await supabase.from('matters').select('id').eq('id', matterId).eq('user_id', userId);
   if (existing && existing.length > 0) {
@@ -116,7 +116,8 @@ export async function createMatter({ id, name, client, description, userId }) {
   }
   const { data, error } = await supabase.from('matters').insert([{
     id: matterId, name: name.trim(), client: client.trim(),
-    description: (description || '').trim(), user_id: userId
+    description: (description || '').trim(), user_id: userId,
+    branch_id: branchId || null
   }]).select();
   if (error) console.error('createMatter:', error.message);
   return { data: data?.[0] || null, error };

@@ -387,7 +387,7 @@ const rFormDirty=useRef(false);
 
   async function handleCreateMatter(){
     if(!matterForm.name||!matterForm.client) return; setMatterSaving(true);
-    const res=await createMatter({...matterForm,userId:user.id});
+    const res=await createMatter({...matterForm,userId:user.id,branchId:profile?.branch_id||null});
     if(res.error){ alert(res.error.message); setMatterSaving(false); return; }
     const savedId=(res.data?.id||matterForm.id).toUpperCase();
     const words=[...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)].filter(w=>w.length>2);
