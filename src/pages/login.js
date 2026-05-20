@@ -175,11 +175,8 @@ if (data?.user) {
             </div>
           </form>
 
-          <div style={{textAlign:'center',marginTop:20,fontSize:12,color:'#555'}}>
-            {mode==='login'
-              ? <><span>Don't have an account? </span><button className="lnk" onClick={()=>{setMode('signup');setError('');}}>Create one</button></>
-              : <><span>Already have an account? </span><button className="lnk" onClick={()=>{setMode('login');setError('');}}>Sign in</button></>
-            }
+          <div style={{textAlign:'center',marginTop:20,fontSize:12,color:'#444'}}>
+            Contact your manager to get access.
           </div>
 
           {mode==='login' && (

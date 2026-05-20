@@ -93,6 +93,7 @@ export default function App() {
   const [analyticsPeriod,setAP]=useState('day');
   const [invoices,setInvoices]=useState([]);
   const [matters,setMatters]=useState([]);
+const [allMatters,setAllMatters]=useState([]);
   const [viewInv,setViewInv]=useState(null);
   const [invMatterId,setInvMatterId]=useState('');
   const [invAtty,setInvAtty]=useState('Adv. T. Motsoeneng');
@@ -219,6 +220,8 @@ const rFormDirty=useRef(false);
       setBranches(branchRes.data||[]);
       setLockedPeriods((locksRes.data||[]).map(l=>l.period));
       setBalanceAlerts(alertsRes.data||[]);
+      const allMat=await fetchMatters(null,true);
+      setAllMatters(allMat.matters||[]);
   if(accs.length&&!rForm.amount&&!rForm.matterId){
   setRForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
   setPForm(f=>f.accountId?f:{...f,accountId:accs[0].id});
@@ -542,7 +545,7 @@ const rFormDirty=useRef(false);
         <label style={C.lbl}>Matter *</label>
         <select style={C.tinp} value={rForm.matterId} onChange={e=>setRForm(f=>({...f,matterId:e.target.value}))}>
           <option value="">Select matter...</option>
-          {matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}
+          {allMatters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}
         </select>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -650,7 +653,7 @@ const rFormDirty=useRef(false);
       {trustTab==='settings'&&(<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
         <div style={C.card}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:16}}>Low balance alerts</div>
           <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
-            <div><label style={C.lbl}>Matter</label><select style={C.tinp} value={alertMatterId} onChange={e=>setAlertMatterId(e.target.value)}><option value="">Select matter...</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}</select></div>
+            <div><label style={C.lbl}>Matter</label><select style={C.tinp} value={alertMatterId} onChange={e=>setAlertMatterId(e.target.value)}><option value="">Select matter...</option>{allMatters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client}</option>)}</select></div>
             <div><label style={C.lbl}>Minimum balance threshold (ZAR)</label><input type="number" style={C.tinp} value={alertMinBal} onChange={e=>setAlertMinBal(parseFloat(e.target.value)||5000)}/><div style={{fontSize:10,color:'#555',marginTop:4}}>Alert shows when balance drops below this</div></div>
             <button style={C.btn('p')} onClick={saveBalanceAlert}>Save alert</button>
           </div>
