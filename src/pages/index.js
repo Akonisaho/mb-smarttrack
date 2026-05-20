@@ -120,6 +120,10 @@ export default function App() {
   const [matterForm,setMatterForm]=useState({id:'',name:'',client:'',description:''});
   const [matterSaving,setMatterSaving]=useState(false);
   const [matterMsg,setMatterMsg]=useState('');
+const [showPwdForm,setShowPwdForm]=useState(false);
+const [pwdForm,setPwdForm]=useState({current:'',newPwd:'',confirm:''});
+const [pwdMsg,setPwdMsg]=useState({msg:'',type:''});
+const [pwdSaving,setPwdSaving]=useState(false);
 
   const APPROVAL_THRESHOLD=50000;
   const [trustTransactions,setTrustTransactions]=useState([]);
@@ -364,7 +368,17 @@ const rFormDirty=useRef(false);
   async function unlockPeriod(period){ if(!confirm(`Unlock period ${period}? Only do this with partner authorisation.`)) return; const {error}=await supabase.from('trust_period_locks').delete().eq('period',period); if(error){ showTrustAlert('Error: '+error.message,'error'); return; } showTrustAlert(`Period ${period} unlocked.`,'success'); loadTrust(); }
   async function saveBalanceAlert(){ if(!alertMatterId){ showTrustAlert('Select a matter.','error'); return; } const {error}=await supabase.from('trust_balance_alerts').upsert([{matter_id:alertMatterId,minimum_balance:alertMinBal,is_active:true,created_by:userId}],{onConflict:'matter_id'}); if(error){ showTrustAlert('Error: '+error.message,'error'); return; } showTrustAlert('✓ Balance alert saved.','success'); loadTrust(); }
 
-  async function reclassify(id,cls){ const act=[...allActs,...liveActs].find(a=>a.id===id); const units=cls==='billable'?Math.max(1,Math.ceil((act?.duration_seconds||0)/360)):0; await patchActivity(id,{classification:cls,billing_units:units,is_billable:cls==='billable'}); load(); }
+  async function handleChangePassword(){
+  if(!pwdForm.newPwd||!pwdForm.confirm){ setPwdMsg({msg:'Please fill in all fields.',type:'error'}); return; }
+  if(pwdForm.newPwd!==pwdForm.confirm){ setPwdMsg({msg:'New passwords do not match.',type:'error'}); return; }
+  if(pwdForm.newPwd.length<6){ setPwdMsg({msg:'Password must be at least 6 characters.',type:'error'}); return; }
+  setPwdSaving(true);
+  const {error}=await supabase.auth.updateUser({password:pwdForm.newPwd});
+  if(error){ setPwdMsg({msg:'Error: '+error.message,type:'error'}); setPwdSaving(false); return; }
+  setPwdMsg({msg:'✓ Password changed successfully!',type:'success'});
+  setPwdSaving(false);
+  setTimeout(()=>{ setShowPwdForm(false); setPwdForm({current:'',newPwd:'',confirm:''}); setPwdMsg({msg:'',type:''}); },2000);
+} const act=[...allActs,...liveActs].find(a=>a.id===id); const units=cls==='billable'?Math.max(1,Math.ceil((act?.duration_seconds||0)/360)):0; await patchActivity(id,{classification:cls,billing_units:units,is_billable:cls==='billable'}); load(); }
   async function assignMatter(actId,matterId){ await patchActivityMatter(actId,matterId); load(); }
 
   async function seedDemo(){
@@ -656,7 +670,8 @@ const rFormDirty=useRef(false);
       <div style={C.hdr}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           {profile?.role==='manager'&&<button style={{background:'transparent',border:'1px solid rgba(108,192,74,0.3)',color:'#6CC04A',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/manager')}>Manager View</button>}
-          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
+          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>setShowPwdForm(true)}>🔒 Password</button>
+<button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           <div style={C.mark}>M<span style={{color:'#6CC04A'}}>B</span></div>
           <div><div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack</div><div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill</div></div>
         </div>
@@ -701,6 +716,27 @@ const rFormDirty=useRef(false);
 
     {showMatterForm&&(<div style={C.modal} onClick={()=>setShowMatterForm(false)}><div style={C.mbox} onClick={e=>e.stopPropagation()}><div style={{fontSize:15,fontWeight:700,marginBottom:4}}>📁 New Client Matter</div><div style={{fontSize:11,color:'#555',marginBottom:20}}>Activities auto-linked by matching window titles.</div><div style={{display:'flex',flexDirection:'column',gap:12}}><div><label style={C.lbl}>Matter ID *</label><input style={C.inp} placeholder="e.g. L2025/042" value={matterForm.id} onChange={e=>setMatterForm(f=>({...f,id:e.target.value.toUpperCase()}))}/></div><div><label style={C.lbl}>Matter name *</label><input style={C.inp} placeholder="e.g. Smith v Jones — Contract Review" value={matterForm.name} onChange={e=>setMatterForm(f=>({...f,name:e.target.value}))}/></div><div><label style={C.lbl}>Client name *</label><input style={C.inp} placeholder="e.g. ABC Corporation" value={matterForm.client} onChange={e=>setMatterForm(f=>({...f,client:e.target.value}))}/></div><div><label style={C.lbl}>Description</label><input style={C.inp} placeholder="Optional" value={matterForm.description} onChange={e=>setMatterForm(f=>({...f,description:e.target.value}))}/></div></div><div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowMatterForm(false)}>Cancel</button><button style={C.btn('p')} onClick={handleCreateMatter} disabled={matterSaving||!matterForm.id||!matterForm.name||!matterForm.client}>{matterSaving?'Creating...':'Create Matter'}</button></div></div></div>)}
 
-    {viewInv&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 20px'}} onClick={()=>setViewInv(null)}><div style={{background:'#111',border:'1px solid #252525',borderRadius:12,padding:24,maxWidth:780,width:'100%'}} onClick={e=>e.stopPropagation()}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · <span style={{color:'#A78BFA'}}>{viewInv.matter_id||viewInv.matter_name}</span></div></div><div style={{display:'flex',gap:8}}><button style={C.btn('g')} onClick={()=>downloadPDF(viewInv,allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id)))}>⬇ PDF</button><button style={C.btn('r')} onClick={async()=>{if(!confirm(`Delete ${viewInv.id}?`)) return;await deleteInvoice(viewInv.id);setViewInv(null);load();}}>Delete</button><button style={C.btn()} onClick={()=>setViewInv(null)}>Close</button></div></div><InvoiceDoc inv={viewInv} acts={allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id))}/></div></div>)}
+    {showPwdForm&&(
+  <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowPwdForm(false)}>
+    <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:32,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:15,fontWeight:700,color:'#F0F0F0',marginBottom:4}}>🔒 Change Password</div>
+      <div style={{fontSize:11,color:'#555',marginBottom:20}}>Choose a strong password you'll remember</div>
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div>
+          <label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>New password *</label>
+          <input type="password" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'10px 14px',borderRadius:7,fontSize:13,fontFamily:'inherit',width:'100%'}} placeholder="Minimum 6 characters" value={pwdForm.newPwd} onChange={e=>setPwdForm(f=>({...f,newPwd:e.target.value}))}/>
+        </div>
+        <div>
+          <label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Confirm new password *</label>
+          <input type="password" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'10px 14px',borderRadius:7,fontSize:13,fontFamily:'inherit',width:'100%'}} placeholder="Repeat new password" value={pwdForm.confirm} onChange={e=>setPwdForm(f=>({...f,confirm:e.target.value}))}/>
+        </div>
+        {pwdMsg.msg&&(<div style={{background:pwdMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${pwdMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:pwdMsg.type==='error'?'#E05252':'#8DC63F'}}>{pwdMsg.msg}</div>)}
+        <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>
+          <button style={{background:'transparent',border:'1px solid #252525',color:'#888',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit'}} onClick={()=>setShowPwdForm(false)}>Cancel</button>
+          <button style={{background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:700}} disabled={pwdSaving} onClick={handleChangePassword}>{pwdSaving?'Saving...':'Change Password'}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}{viewInv&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 20px'}} onClick={()=>setViewInv(null)}><div style={{background:'#111',border:'1px solid #252525',borderRadius:12,padding:24,maxWidth:780,width:'100%'}} onClick={e=>e.stopPropagation()}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · <span style={{color:'#A78BFA'}}>{viewInv.matter_id||viewInv.matter_name}</span></div></div><div style={{display:'flex',gap:8}}><button style={C.btn('g')} onClick={()=>downloadPDF(viewInv,allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id)))}>⬇ PDF</button><button style={C.btn('r')} onClick={async()=>{if(!confirm(`Delete ${viewInv.id}?`)) return;await deleteInvoice(viewInv.id);setViewInv(null);load();}}>Delete</button><button style={C.btn()} onClick={()=>setViewInv(null)}>Close</button></div></div><InvoiceDoc inv={viewInv} acts={allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id))}/></div></div>)}
   </>);
-}
