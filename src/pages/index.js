@@ -368,7 +368,7 @@ const rFormDirty=useRef(false);
   async function unlockPeriod(period){ if(!confirm(`Unlock period ${period}? Only do this with partner authorisation.`)) return; const {error}=await supabase.from('trust_period_locks').delete().eq('period',period); if(error){ showTrustAlert('Error: '+error.message,'error'); return; } showTrustAlert(`Period ${period} unlocked.`,'success'); loadTrust(); }
   async function saveBalanceAlert(){ if(!alertMatterId){ showTrustAlert('Select a matter.','error'); return; } const {error}=await supabase.from('trust_balance_alerts').upsert([{matter_id:alertMatterId,minimum_balance:alertMinBal,is_active:true,created_by:userId}],{onConflict:'matter_id'}); if(error){ showTrustAlert('Error: '+error.message,'error'); return; } showTrustAlert('✓ Balance alert saved.','success'); loadTrust(); }
 
-  async async function handleChangePassword(){
+  async function handleChangePassword(){
   if(!pwdForm.newPwd||!pwdForm.confirm){ setPwdMsg({msg:'Please fill in all fields.',type:'error'}); return; }
   if(pwdForm.newPwd!==pwdForm.confirm){ setPwdMsg({msg:'New passwords do not match.',type:'error'}); return; }
   if(pwdForm.newPwd.length<6){ setPwdMsg({msg:'Password must be at least 6 characters.',type:'error'}); return; }
