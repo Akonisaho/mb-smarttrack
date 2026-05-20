@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     });
 const resendData = await resendResult.json();
 console.log('Resend result:', JSON.stringify({ status: resendResult.status, data: resendData }));
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, tempPassword: tempPass });
   } catch(e) {
     console.error('Exception:', e.message);
     return res.status(500).json({ error: e.message });
