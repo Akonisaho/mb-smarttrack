@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, inviteStaff } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices } from '../lib/supabase';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
-function pct(a,b){ return b>0?Math.round((a/b)*100):0; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
 function fmonth(m){ try{return new Date(m+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'});}catch{return m;} }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
@@ -41,7 +40,6 @@ export default function Manager() {
   const [selBranch,setSelBranch]         = useState('all');
   const [branches,setBranches]           = useState([]);
   const [clock,setClock]                 = useState('');
-  const [rate,setRate]                   = useState(150);
   const [histYear,setHistYear]           = useState(new Date().getFullYear());
   const [histData,setHistData]           = useState([]);
   const [selMonth,setSelMonth]           = useState(null);
@@ -55,6 +53,7 @@ export default function Manager() {
   const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:''});
   const [inviting,setInviting]           = useState(false);
   const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
+  const rate = 150;
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -85,8 +84,7 @@ export default function Manager() {
     if(sumRes.allTime)   setAllTime(sumRes.allTime);
     if(profRes.profiles) setProfiles(profRes.profiles);
     if(invRes.invoices)  setInvoices(invRes.invoices||[]);
-    const br=branchRes.data||[];
-    setBranches(br);
+    setBranches(branchRes.data||[]);
     setMatters(matRes.data||[]);
     const txns=trustRes.data||[];
     setTrustTxns(txns);
@@ -138,46 +136,30 @@ export default function Manager() {
     setMonthActs(data||[]);
   };
 
-  function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),6000); }
+  function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),8000); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
-  async function removeStaff(userId,name){
-  if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return;
-  const res=await fetch('/api/remove-staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})});
-  const data=await res.json();
-  if(!res.ok){showAlert('Error: '+data.error,'error');return;}
-  showAlert(`✓ ${name} removed.`,'success');
-  load();
-}
+  async function removeStaff(userId,name){ if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return; const res=await fetch('/api/remove-staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})}); const data=await res.json(); if(!res.ok){showAlert('Error: '+data.error,'error');return;} showAlert(`✓ ${name} removed.`,'success'); load(); }
 
   async function handleInvite(){
     if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
     setInviting(true);
     setInviteMsg({msg:'',type:''});
-    const res = await fetch('/api/invite', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inviteForm)});
+    const res = await fetch('/api/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inviteForm)});
     const result = await res.json();
-    if(!res.ok){setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'});setInviting(false);return;}
+    if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temp password: ${result.tempPassword||'check records'} — share via WhatsApp.`,'success');
-    setInviting(false);setShowInvite(false);
+    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword||'see records'} — share via WhatsApp.`,'success');
+    setInviting(false);
+    setShowInvite(false);
     setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
     load();
   }
-const result = await res.json();
-if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
-setInviting(false);
-setShowInvite(false);
-setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
-load();
-return;
-
-  }
 
   const isBranchManager = profile?.role==='branch_manager';
-const myBranch = isBranchManager ? profile?.branch_id : selBranch;
-const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filter(p=>p.branch_id===myBranch);
-  const filtered = selAtty==='all' ? summary : summary.filter(s=>s.user_id===selAtty);
+  const myBranch = isBranchManager ? profile?.branch_id : selBranch;
+  const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filter(p=>p.branch_id===myBranch);
   const filteredAllTime = selAtty==='all' ? allTime : allTime.filter(a=>a.user_id===selAtty);
   const firmTotalSec   = filteredAllTime.reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmBillSec    = filteredAllTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
@@ -195,46 +177,17 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
     const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
     const allUnits=allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
     const br=branches.find(b=>b.id===p.branch_id);
-    return{
-      ...p,
-      branch_name:br?.name||'—',
-      total_sec:allTimeP.reduce((s,a)=>s+(a.duration_seconds||0),0),
-      bill_sec:allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0),
-      all_units:allUnits,
-      billed_units:billedU,
-      unbilled_units:Math.max(0,allUnits-billedU),
-      invoiceCount:attyInvs.length,
-    };
+    return{...p,branch_name:br?.name||'—',total_sec:allTimeP.reduce((s,a)=>s+(a.duration_seconds||0),0),bill_sec:allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0),all_units:allUnits,billed_units:billedU,unbilled_units:Math.max(0,allUnits-billedU),invoiceCount:attyInvs.length};
   }).sort((a,b)=>b.all_units-a.all_units);
 
   const matterMap={};
-  filtInvoices.forEach(inv=>{
-    const key=inv.matter_id||inv.matter_name||'Unknown';
-    if(!matterMap[key]) matterMap[key]={id:key,name:inv.matter_name||key,client:inv.client||'',invoiceCount:0,billedAmt:0};
-    matterMap[key].invoiceCount++;
-    matterMap[key].billedAmt+=(inv.total_units||0)*(inv.rate||150);
-  });
+  filtInvoices.forEach(inv=>{ const key=inv.matter_id||inv.matter_name||'Unknown'; if(!matterMap[key]) matterMap[key]={id:key,name:inv.matter_name||key,client:inv.client||'',invoiceCount:0,billedAmt:0}; matterMap[key].invoiceCount++; matterMap[key].billedAmt+=(inv.total_units||0)*(inv.rate||150); });
   const topMatters=Object.values(matterMap).sort((a,b)=>b.billedAmt-a.billedAmt).slice(0,10);
-
-  const monthBars=histData.filter(m=>m.sessions>0).map(m=>({
-    label:new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'short'}),
-    label2:`${m.billable_units}u`,
-    value:m.billable_units,
-    color:m.billable_units>0?'#8DC63F':'#2E4A6E'
-  }));
-
-  const branchTrustData=branches.map(b=>{
-    const bTxns=trustTxns.filter(t=>t.branch_id===b.id&&t.status==='posted');
-    const bBal=bTxns.reduce((s,t)=>t.type==='receipt'?s+Number(t.amount):s-Number(t.amount),0);
-    const bR=bTxns.filter(t=>t.type==='receipt').reduce((s,t)=>s+Number(t.amount),0);
-    const bP=bTxns.filter(t=>t.type==='payment').reduce((s,t)=>s+Number(t.amount),0);
-    return{...b,balance:bBal,receipts:bR,payments:bP,txnCount:bTxns.length};
-  });
+  const monthBars=histData.filter(m=>m.sessions>0).map(m=>({label:new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'short'}),label2:`${m.billable_units}u`,value:m.billable_units,color:m.billable_units>0?'#8DC63F':'#2E4A6E'}));
+  const branchTrustData=branches.map(b=>{ const bTxns=trustTxns.filter(t=>t.branch_id===b.id&&t.status==='posted'); return{...b,balance:bTxns.reduce((s,t)=>t.type==='receipt'?s+Number(t.amount):s-Number(t.amount),0),receipts:bTxns.filter(t=>t.type==='receipt').reduce((s,t)=>s+Number(t.amount),0),payments:bTxns.filter(t=>t.type==='payment').reduce((s,t)=>s+Number(t.amount),0),txnCount:bTxns.length}; });
 
   const roleColor=(role)=>role==='manager'||role==='national_manager'?'#A78BFA':role==='branch_manager'?'#4A90D9':role==='bookkeeper'?'#EAB308':'#8DC63F';
   const roleBg=(role)=>role==='manager'||role==='national_manager'?'rgba(167,139,250,0.1)':role==='branch_manager'?'rgba(74,144,217,0.1)':role==='bookkeeper'?'rgba(234,179,8,0.1)':'rgba(141,198,63,0.1)';
-
-  const inp={background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'10px 14px',borderRadius:7,fontSize:13,fontFamily:"'DM Sans',system-ui,sans-serif",width:'100%'};
   const lbl={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};
 
   const C={
@@ -257,28 +210,13 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
   return(
     <>
       <Head><title>MB SmartTrack — Manager</title></Head>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',system-ui,sans-serif}
-        ::-webkit-scrollbar{width:3px;height:3px}
-        ::-webkit-scrollbar-track{background:#111}
-        ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}
-        table tr:hover td{background:rgba(141,198,63,0.025)}
-        select option{background:#1A1A1A;color:#F0F0F0}
-        input[type=date]{color-scheme:dark}
-        button:hover{opacity:.85}
-        .mb-inp{background:#1A1A1A;border:1px solid #252525;color:#F0F0F0;padding:10px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',system-ui,sans-serif;width:100%;display:block;}
-        .mb-inp:focus{outline:1px solid rgba(141,198,63,0.5);border-color:rgba(141,198,63,0.4);}
-        .mb-inp option{background:#1A1A1A;color:#F0F0F0;}
-      `}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}table tr:hover td{background:rgba(141,198,63,0.025)}select option{background:#1A1A1A;color:#F0F0F0}input[type=date]{color-scheme:dark}button:hover{opacity:.85}.mb-inp{background:#1A1A1A;border:1px solid #252525;color:#F0F0F0;padding:10px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',system-ui,sans-serif;width:100%;display:block;}.mb-inp:focus{outline:1px solid rgba(141,198,63,0.5);border-color:rgba(141,198,63,0.4);}.mb-inp option{background:#1A1A1A;color:#F0F0F0;}`}</style>
       <div style={C.page}>
 
-        {/* Header */}
         <div style={C.hdr}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <img src="/logo.png" alt="MB" style={{width:34,height:34,objectFit:'contain',borderRadius:6}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
-            <div style={{display:'none',background:'#8DC63F',borderRadius:6,width:34,height:34,alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:'#0A0A0A',letterSpacing:'-0.05em'}}>MB</div>
+            <div style={{display:'none',background:'#8DC63F',borderRadius:6,width:34,height:34,alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:'#0A0A0A'}}>MB</div>
             <div>
               <div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack — Manager</div>
               <div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill · {profile?.full_name}</div>
@@ -298,366 +236,115 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
           </div>
         </div>
 
-        {/* Alert banner */}
-        {trustAlert.msg&&(
-          <div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'10px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}>
-            <span>{trustAlert.msg}</span>
-            <button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button>
-          </div>
-        )}
+        {trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'10px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{trustAlert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button></div>)}
+        {pendingPayments.length>0&&tab!=='trust'&&(<div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>⏳ {pendingPayments.length} trust payment{pendingPayments.length>1?'s':''} pending your approval — {fmtR(pendingPayments.reduce((s,t)=>s+Number(t.amount),0))}</span><button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review approvals →</button></div>)}
 
-        {/* Pending payments banner */}
-        {pendingPayments.length>0&&tab!=='trust'&&(
-          <div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span>⏳ {pendingPayments.length} trust payment{pendingPayments.length>1?'s':''} pending your approval — {fmtR(pendingPayments.reduce((s,t)=>s+Number(t.amount),0))}</span>
-            <button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review approvals →</button>
-          </div>
-        )}
-
-        {/* ══ OVERVIEW ══════════════════════════════════════════ */}
-        {tab==='overview'&&(
-          <div style={C.main}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-              <div>
-                <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div>
-                <div style={{fontSize:11,color:'#444'}}>{fdate(selDate)} · {profiles.length} staff · {branches.length} branches</div>
-              </div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-                <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
-                {!isBranchManager&&(
-  <select style={C.sel} value={selBranch} onChange={e=>{setSelBranch(e.target.value);setSelAtty('all');}}>
-    <option value="all">All branches</option>
-    {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-  </select>
-)}
-{isBranchManager&&(
-  <span style={{fontSize:12,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'5px 12px',borderRadius:6}}>
-    {branches.find(b=>b.id===profile?.branch_id)?.name||'Your branch'}
-  </span>
-)}
-                <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}>
-                  <option value="all">All attorneys</option>
-                  {filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </select>
-<input 
-  type="number" 
-  style={{...C.sel,width:120}} 
-  value={rate} 
-  onChange={e=>setRate(parseInt(e.target.value)||150)}
-  placeholder="R/unit"
-  min={50}
-/>
-              </div>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-              {[
-                {l:'Total Time Tracked',v:toHm(firmTotalSec),s:`${toHm(firmBillSec)} billable`,a:false,w:false},
-                {l:'Billed Revenue',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`,a:true,w:false},
-                {l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`,a:false,w:true},
-                {l:'Total Trust Held',v:fmtR(totalTrustHeld),s:`${pendingPayments.length} payment${pendingPayments.length===1?'':'s'} pending`,a:false,w:false},
-              ].map(({l,v,s,a,w})=>(
-                <div key={l} style={C.stat(a,w)}>
-                  <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
-                  <div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div>
-                  <div style={{fontSize:10,color:'#444'}}>{s}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
-              {branchTrustData.map(b=>(
-                <div key={b.id} style={{...C.card,marginBottom:0}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div>
-                    <div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div>
-                  </div>
-                  <div style={{fontSize:10,color:'#555',marginBottom:2}}>{b.address}</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginTop:8,fontSize:11}}>
-                    <div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Receipts</div><div style={{color:'#8DC63F',fontWeight:600}}>{fmtR(b.receipts)}</div></div>
-                    <div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Payments</div><div style={{color:'#E05252',fontWeight:600}}>{fmtR(b.payments)}</div></div>
-                    <div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Transactions</div><div style={{color:'#888',fontWeight:600}}>{b.txnCount}</div></div>
-                  </div>
-                  <div style={{marginTop:8,fontSize:10,color:'#555'}}>{profiles.filter(p=>p.branch_id===b.id).length} staff assigned</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={C.card}>
-              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Leaderboard — All Time</div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr>{['#','Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {!byAtty.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No data yet.</td></tr>}
-                    {byAtty.map((a,i)=>(
-                      <tr key={a.id}>
-                        <td style={{...C.td,color:'#444',fontWeight:600,width:28}}>{i+1}</td>
-                        <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td>
-                        <td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:600}}>{a.branch_name}</span></td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}<div style={{fontSize:9,color:'#444'}}>R{(a.billed_units*rate).toLocaleString()}</div></td>
-                        <td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}{a.unbilled_units>0&&<div style={{fontSize:9,color:'#444'}}>R{(a.unbilled_units*rate).toLocaleString()}</div>}</td>
-                        <td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{a.invoiceCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-              <div style={C.card}>
-                <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Top Matters by Billed Revenue</div>
-                {!topMatters.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:(
-                  <table style={{width:'100%',borderCollapse:'collapse'}}>
-                    <thead><tr>{['Matter ID','Client','Invoices','Billed (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                    <tbody>{topMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td></tr>))}</tbody>
-                  </table>
-                )}
-              </div>
-              <div style={C.card}>
-                <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Recent Invoices — All Attorneys</div>
-                {!filtInvoices.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:(
-                  <table style={{width:'100%',borderCollapse:'collapse'}}>
-                    <thead><tr>{['Invoice','Client','Period','Incl. VAT'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                    <tbody>{filtInvoices.slice(0,8).map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}</tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-            <div style={{marginTop:14,textAlign:'center',fontSize:11,color:'#252525'}}>Motsoeneng Bill · MB SmartTrack Manager View · Activity details are private to each attorney</div>
-          </div>
-        )}
-
-        {/* ══ TRUST ══════════════════════════════════════════════ */}
-        {tab==='trust'&&(
-          <div style={C.main}>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Trust Accounting</div>
-            <div style={{fontSize:11,color:'#444',marginBottom:16}}>All branches · Legal Practice Act compliant</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
-              {[
-                {l:'Total trust held',v:fmtR(totalTrustHeld),a:true,w:false},
-                {l:'Total receipts',v:fmtR(trustTxns.filter(t=>t.type==='receipt'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},
-                {l:'Total payments',v:fmtR(trustTxns.filter(t=>t.type==='payment'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},
-                {l:'Pending approvals',v:pendingPayments.length,a:false,w:pendingPayments.length>0},
-              ].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
-              {branchTrustData.map(b=>(
-                <div key={b.id} style={{...C.card,marginBottom:0,border:selBranch===b.id?'1px solid rgba(141,198,63,0.4)':'1px solid #1A1A1A',cursor:'pointer'}} onClick={()=>setSelBranch(selBranch===b.id?'all':b.id)}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:16,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div>
-                  <div style={{fontSize:10,color:'#555',marginBottom:8}}>{b.address}</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,fontSize:11}}>
-                    <div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Receipts</div><div style={{color:'#8DC63F'}}>{fmtR(b.receipts)}</div></div>
-                    <div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Payments</div><div style={{color:'#E05252'}}>{fmtR(b.payments)}</div></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={C.card}>
-              <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Payment approvals {pendingPayments.length>0&&<span style={{marginLeft:8,background:'rgba(234,179,8,0.15)',color:'#EAB308',fontSize:10,padding:'2px 10px',borderRadius:20,border:'1px solid rgba(234,179,8,0.3)'}}>{pendingPayments.length} pending</span>}</div>
-              {!pendingPayments.length?(<div style={{textAlign:'center',padding:'30px',color:'#555'}}><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:12}}>No payments pending approval</div></div>):pendingPayments.map((t,i)=>{
-                const m=matters.find(x=>x.id===t.matter_id),br=branches.find(b=>b.id===t.branch_id),bal=trustBalances[t.matter_id]||0;
-                return(<div key={i} style={{border:'1px solid rgba(234,179,8,0.3)',borderRadius:8,padding:16,marginBottom:10}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
-                    <div style={{flex:1}}>
-                      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}><span style={{fontSize:9,background:'rgba(234,179,8,0.1)',color:'#EAB308',border:'1px solid rgba(234,179,8,0.3)',padding:'2px 10px',borderRadius:20,fontWeight:600}}>PENDING APPROVAL</span><span style={{fontSize:10,color:'#555'}}>{fmtDate(t.date)}</span>{br&&<span style={{fontSize:10,color:'#555',border:'1px solid #252525',padding:'1px 8px',borderRadius:20}}>{br.name}</span>}</div>
-                      <div style={{fontSize:20,fontWeight:700,color:'#EAB308',marginBottom:6}}>{fmtR(t.amount)}</div>
-                      <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Payee: <strong>{t.payee}</strong></div>
-                      <div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Matter: <span style={{color:'#A78BFA'}}>{t.matter_id}</span> — {m?.client||'—'}</div>
-                      <div style={{fontSize:11,color:'#555',marginBottom:8}}>{t.narration}</div>
-                      <div style={{background:'rgba(234,179,8,0.05)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'#888'}}>Available balance: <strong style={{color:'#8DC63F'}}>{fmtR(bal)}</strong> · After approval: <strong style={{color:bal-Number(t.amount)>=0?'#8DC63F':'#E05252'}}>{fmtR(bal-Number(t.amount))}</strong></div>
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:140}}>
-                      <button style={C.btn('p')} onClick={()=>{ if(confirm(`Approve payment of ${fmtR(t.amount)} to ${t.payee}?`)) approvePayment(t.id); }}>✓ Approve</button>
-                      <button style={C.btn('r')} onClick={()=>{ const r=prompt('Reason for rejection:'); if(r!==null) rejectPayment(t.id,r); }}>✗ Reject</button>
-                    </div>
-                  </div>
-                </div>);
-              })}
-            </div>
-            <div style={C.card}>
-              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Trust balances — all matters</div>
-              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Branch','Trust Balance'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
-                {!matters.length&&<tr><td colSpan={4} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No matters yet</td></tr>}
-                {matters.map(m=>{ const bal=trustBalances[m.id]||0,br=branches.find(b=>b.id===m.branch_id); return(<tr key={m.id} style={{opacity:bal===0?0.4:1}}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.id}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{m.client}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,textAlign:'right',color:bal>0?'#8DC63F':bal<0?'#E05252':'#555'}}>{fmtR(bal)}</td></tr>); })}
-                <tr style={{background:'#0D0D0D'}}><td colSpan={3} style={{...C.th,paddingTop:12}}>Grand total</td><td style={{...C.th,fontFamily:'monospace',fontSize:13,color:'#8DC63F',textAlign:'right',paddingTop:12}}>{fmtR(totalTrustHeld)}</td></tr>
-              </tbody></table></div>
+        {tab==='overview'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div><div style={{fontSize:11,color:'#444'}}>{fdate(selDate)} · {profiles.length} staff · {branches.length} branches</div></div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
+              {!isBranchManager&&(<select style={C.sel} value={selBranch} onChange={e=>{setSelBranch(e.target.value);setSelAtty('all');}}><option value="all">All branches</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
+              {isBranchManager&&(<span style={{fontSize:12,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'5px 12px',borderRadius:6}}>{branches.find(b=>b.id===profile?.branch_id)?.name||'Your branch'}</span>)}
+              <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
             </div>
           </div>
-        )}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {[{l:'Total Time Tracked',v:toHm(firmTotalSec),s:`${toHm(firmBillSec)} billable`,a:false,w:false},{l:'Billed Revenue',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`,a:true,w:false},{l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`,a:false,w:true},{l:'Total Trust Held',v:fmtR(totalTrustHeld),s:`${pendingPayments.length} payment${pendingPayments.length===1?'':'s'} pending`,a:false,w:false}].map(({l,v,s,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+            {branchTrustData.map(b=>(<div key={b.id} style={{...C.card,marginBottom:0}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div><div style={{fontSize:10,color:'#555',marginBottom:2}}>{b.address}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginTop:8,fontSize:11}}><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Receipts</div><div style={{color:'#8DC63F',fontWeight:600}}>{fmtR(b.receipts)}</div></div><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Payments</div><div style={{color:'#E05252',fontWeight:600}}>{fmtR(b.payments)}</div></div><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Transactions</div><div style={{color:'#888',fontWeight:600}}>{b.txnCount}</div></div></div><div style={{marginTop:8,fontSize:10,color:'#555'}}>{profiles.filter(p=>p.branch_id===b.id).length} staff assigned</div></div>))}
+          </div>
+          <div style={C.card}>
+            <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Leaderboard — All Time</div>
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['#','Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!byAtty.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No data yet.</td></tr>}{byAtty.map((a,i)=>(<tr key={a.id}><td style={{...C.td,color:'#444',fontWeight:600,width:28}}>{i+1}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:600}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{a.invoiceCount}</td></tr>))}</tbody></table></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Top Matters by Billed Revenue</div>{!topMatters.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Invoices','Billed'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{topMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td></tr>))}</tbody></table>}</div>
+            <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Recent Invoices</div>{!filtInvoices.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Period','Incl. VAT'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{filtInvoices.slice(0,8).map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}</tbody></table>}</div>
+          </div>
+          <div style={{marginTop:14,textAlign:'center',fontSize:11,color:'#252525'}}>Motsoeneng Bill · MB SmartTrack Manager View</div>
+        </div>)}
 
-        {/* ══ ANALYTICS ═══════════════════════════════════════════ */}
-        {tab==='analytics'&&(
-          <div style={C.main}>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>Firm Analytics</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-              {[{l:'Total Staff',v:profiles.length,s:'across all branches'},{l:'Total Units (All Time)',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},{l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},{l:'Total Unbilled',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units pending`}].map(({l,v,s})=>(<div key={l} style={C.stat(false,false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
-            </div>
-            <div style={C.card}>
-              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance — All Time</div>
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>{['Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Est. Unbilled Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                <tbody>{byAtty.map(a=>(<tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td></tr>))}</tbody>
-              </table>
+        {tab==='trust'&&(<div style={C.main}>
+          <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Trust Accounting</div>
+          <div style={{fontSize:11,color:'#444',marginBottom:16}}>All branches · Legal Practice Act compliant</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
+            {[{l:'Total trust held',v:fmtR(totalTrustHeld),a:true,w:false},{l:'Total receipts',v:fmtR(trustTxns.filter(t=>t.type==='receipt'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},{l:'Total payments',v:fmtR(trustTxns.filter(t=>t.type==='payment'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},{l:'Pending approvals',v:pendingPayments.length,a:false,w:pendingPayments.length>0}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+            {branchTrustData.map(b=>(<div key={b.id} style={{...C.card,marginBottom:0,cursor:'pointer'}} onClick={()=>setSelBranch(selBranch===b.id?'all':b.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:16,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div><div style={{fontSize:10,color:'#555',marginBottom:8}}>{b.address}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,fontSize:11}}><div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Receipts</div><div style={{color:'#8DC63F'}}>{fmtR(b.receipts)}</div></div><div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Payments</div><div style={{color:'#E05252'}}>{fmtR(b.payments)}</div></div></div></div>))}
+          </div>
+          <div style={C.card}>
+            <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Payment approvals {pendingPayments.length>0&&<span style={{marginLeft:8,background:'rgba(234,179,8,0.15)',color:'#EAB308',fontSize:10,padding:'2px 10px',borderRadius:20,border:'1px solid rgba(234,179,8,0.3)'}}>{pendingPayments.length} pending</span>}</div>
+            {!pendingPayments.length?(<div style={{textAlign:'center',padding:'30px',color:'#555'}}><div style={{fontSize:24,marginBottom:8}}>✅</div><div style={{fontSize:12}}>No payments pending approval</div></div>):pendingPayments.map((t,i)=>{ const m=matters.find(x=>x.id===t.matter_id),br=branches.find(b=>b.id===t.branch_id),bal=trustBalances[t.matter_id]||0; return(<div key={i} style={{border:'1px solid rgba(234,179,8,0.3)',borderRadius:8,padding:16,marginBottom:10}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}><div style={{flex:1}}><div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}><span style={{fontSize:9,background:'rgba(234,179,8,0.1)',color:'#EAB308',border:'1px solid rgba(234,179,8,0.3)',padding:'2px 10px',borderRadius:20,fontWeight:600}}>PENDING APPROVAL</span><span style={{fontSize:10,color:'#555'}}>{fmtDate(t.date)}</span>{br&&<span style={{fontSize:10,color:'#555',border:'1px solid #252525',padding:'1px 8px',borderRadius:20}}>{br.name}</span>}</div><div style={{fontSize:20,fontWeight:700,color:'#EAB308',marginBottom:6}}>{fmtR(t.amount)}</div><div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Payee: <strong>{t.payee}</strong></div><div style={{fontSize:12,color:'#D0D0D0',marginBottom:2}}>Matter: <span style={{color:'#A78BFA'}}>{t.matter_id}</span> — {m?.client||'—'}</div><div style={{fontSize:11,color:'#555',marginBottom:8}}>{t.narration}</div><div style={{background:'rgba(234,179,8,0.05)',borderRadius:6,padding:'8px 12px',fontSize:11,color:'#888'}}>Balance: <strong style={{color:'#8DC63F'}}>{fmtR(bal)}</strong> · After: <strong style={{color:bal-Number(t.amount)>=0?'#8DC63F':'#E05252'}}>{fmtR(bal-Number(t.amount))}</strong></div></div><div style={{display:'flex',flexDirection:'column',gap:8,minWidth:140}}><button style={C.btn('p')} onClick={()=>{ if(confirm(`Approve payment of ${fmtR(t.amount)} to ${t.payee}?`)) approvePayment(t.id); }}>✓ Approve</button><button style={C.btn('r')} onClick={()=>{ const r=prompt('Reason for rejection:'); if(r!==null) rejectPayment(t.id,r); }}>✗ Reject</button></div></div></div>); })}
+          </div>
+          <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Trust balances — all matters</div><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Branch','Trust Balance'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!matters.length&&<tr><td colSpan={4} style={{...C.td,textAlign:'center',color:'#333',padding:20}}>No matters yet</td></tr>}{matters.map(m=>{ const bal=trustBalances[m.id]||0,br=branches.find(b=>b.id===m.branch_id); return(<tr key={m.id} style={{opacity:bal===0?0.4:1}}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.id}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{m.client}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{br?.name||'—'}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,textAlign:'right',color:bal>0?'#8DC63F':bal<0?'#E05252':'#555'}}>{fmtR(bal)}</td></tr>); })}<tr style={{background:'#0D0D0D'}}><td colSpan={3} style={{...C.th,paddingTop:12}}>Grand total</td><td style={{...C.th,fontFamily:'monospace',fontSize:13,color:'#8DC63F',textAlign:'right',paddingTop:12}}>{fmtR(totalTrustHeld)}</td></tr></tbody></table></div></div>
+        </div>)}
+
+        {tab==='analytics'&&(<div style={C.main}>
+          <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>Firm Analytics</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {[{l:'Total Staff',v:profiles.length,s:'across all branches'},{l:'Total Units',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},{l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},{l:'Total Unbilled',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units pending`}].map(({l,v,s})=>(<div key={l} style={C.stat(false,false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+          </div>
+          <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Est. Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{byAtty.map(a=>(<tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td></tr>))}</tbody></table></div>
+        </div>)}
+
+        {tab==='history'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>All attorneys · {histYear}</div></div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
+              <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
             </div>
           </div>
-        )}
+          {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {histData.map(m=>{ const isSelected=selMonth===m.month,hasFuture=new Date(m.month+'-01')>new Date(); return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}><div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>{m.sessions?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#8DC63F':'#888',marginBottom:2}}>{toHm(m.total_seconds)}</div><div style={{fontSize:10,color:'#555'}}>{m.sessions} sessions</div><div style={{fontSize:11,color:'#8DC63F',marginTop:4,fontWeight:600}}>{m.billable_units} units</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}</div>); })}
+          </div>
+          {selMonth&&monthActs.length>0&&(<div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>{fmonth(selMonth)} · {monthActs.length} sessions</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Attorney','Application','Duration','Units','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{monthActs.filter(a=>a.is_billable).map(a=>(<tr key={a.id}><td style={{...C.td,fontSize:10,color:'#555',fontFamily:'monospace'}}>{a.date}</td><td style={{...C.td,color:'#C8C8C8'}}>{a.profiles?.full_name||'—'}</td><td style={{...C.td,color:'#888'}}>{a.app_display_name}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.duration_seconds)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{a.billing_units}</td><td style={C.td}><span style={{color:'#8DC63F',fontSize:9,padding:'2px 8px',border:'1px solid rgba(141,198,63,0.3)',borderRadius:20}}>Billable</span></td></tr>))}</tbody></table></div>)}
+        </div>)}
 
-        {/* ══ HISTORY ═════════════════════════════════════════════ */}
-        {tab==='history'&&(
-          <div style={C.main}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-              <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>All attorneys · {histYear}</div></div>
-              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
-                <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+        {tab==='invoices'&&(<div style={C.main}>
+          <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
+          <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!filtInvoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}{filtInvoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}{filtInvoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td></tr>)}</tbody></table></div>
+        </div>)}
+
+        {tab==='staff'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Staff Management</div><div style={{fontSize:11,color:'#444',marginTop:2}}>{profiles.length} staff members · {branches.length} branches · No IT needed</div></div>
+            <button style={C.btn('p')} onClick={()=>{ setShowInvite(true); setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''}); setInviteMsg({msg:'',type:''}); }}>+ Add Staff Member</button>
+          </div>
+          <div style={C.card}>
+            <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All staff</div>
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Name','Email','Role','Branch','Change Branch','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!profiles.length&&<tr><td colSpan={6} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet</td></tr>}{profiles.map(p=>{ const br=branches.find(b=>b.id===p.branch_id); return(<tr key={p.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{p.email||'—'}</td><td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td><td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td><td style={C.td}><select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}><option value="">— select —</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></td><td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button></td></tr>); })}</tbody></table></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+            {branches.map(b=>{ const bStaff=profiles.filter(p=>p.branch_id===b.id); return(<div key={b.id} style={C.card}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{b.name}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>{b.address}</div><div style={{fontSize:22,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{bStaff.length}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>staff members</div><div style={{display:'flex',flexDirection:'column',gap:4}}>{bStaff.map(s=>(<div key={s.id} style={{fontSize:11,color:'#888',display:'flex',alignItems:'center',gap:6}}><span style={{width:6,height:6,borderRadius:'50%',background:roleColor(s.role),display:'inline-block',flexShrink:0}}/><span>{s.full_name}</span><span style={{fontSize:9,color:'#444'}}>({s.role||'attorney'})</span></div>))}{!bStaff.length&&<div style={{fontSize:11,color:'#333'}}>No staff assigned</div>}</div></div>); })}
+          </div>
+        </div>)}
+
+        {showInvite&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowInvite(false)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:32,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',marginBottom:4}}>Add Staff Member</div>
+            <div style={{fontSize:11,color:'#555',marginBottom:24}}>Create an account. The temporary password will be shown after — share it via WhatsApp.</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div><label style={lbl}>Full name *</label><input className="mb-inp" type="text" placeholder="e.g. Adv. Sarah Nkosi" value={inviteForm.fullName} onChange={e=>setInviteForm(f=>({...f,fullName:e.target.value}))}/></div>
+              <div><label style={lbl}>Email address *</label><input className="mb-inp" type="email" placeholder="their@email.com" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Role *</label><select className="mb-inp" value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value}))}><option value="attorney">Attorney / Fee Earner</option><option value="branch_manager">Branch Manager</option><option value="manager">National Manager</option><option value="bookkeeper">Bookkeeper</option></select></div>
+                <div><label style={lbl}>Branch *</label><select className="mb-inp" value={inviteForm.branchId} onChange={e=>setInviteForm(f=>({...f,branchId:e.target.value}))}><option value="">Select branch...</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
               </div>
-            </div>
-            {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-              {histData.map(m=>{ const isSelected=selMonth===m.month,hasFuture=new Date(m.month+'-01')>new Date(); return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}><div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>{m.sessions?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#8DC63F':'#888',marginBottom:2}}>{toHm(m.total_seconds)}</div><div style={{fontSize:10,color:'#555'}}>{m.sessions} sessions</div><div style={{fontSize:11,color:'#8DC63F',marginTop:4,fontWeight:600}}>{m.billable_units} units</div><div style={{fontSize:9,color:'#444'}}>R{(m.billable_units*rate).toLocaleString()} est.</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}</div>); })}
-            </div>
-            {selMonth&&monthActs.length>0&&(<div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>{fmonth(selMonth)} · {monthActs.length} sessions</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Attorney','Application','Duration','Units','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{monthActs.filter(a=>a.is_billable).map(a=>(<tr key={a.id}><td style={{...C.td,fontSize:10,color:'#555',fontFamily:'monospace'}}>{a.date}</td><td style={{...C.td,color:'#C8C8C8'}}>{a.profiles?.full_name||'—'}</td><td style={{...C.td,color:'#888'}}>{a.app_display_name}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.duration_seconds)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{a.billing_units}</td><td style={C.td}><span style={{color:'#8DC63F',fontSize:9,padding:'2px 8px',border:'1px solid rgba(141,198,63,0.3)',borderRadius:20}}>Billable</span></td></tr>))}</tbody></table></div>)}
-          </div>
-        )}
-
-        {/* ══ INVOICES ════════════════════════════════════════════ */}
-        {tab==='invoices'&&(
-          <div style={C.main}>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
-            <div style={C.card}>
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {!filtInvoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}
-                  {filtInvoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}
-                  {filtInvoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ══ STAFF ═══════════════════════════════════════════════ */}
-        {tab==='staff'&&(
-          <div style={C.main}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>
-              <div>
-                <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Staff Management</div>
-                <div style={{fontSize:11,color:'#444',marginTop:2}}>{profiles.length} staff members · {branches.length} branches · No IT needed</div>
-              </div>
-              <button style={C.btn('p')} onClick={()=>{ setShowInvite(true); setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''}); setInviteMsg({msg:'',type:''}); }}>+ Add Staff Member</button>
-            </div>
-
-            {/* Staff table */}
-            <div style={C.card}>
-              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All staff</div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr>{['Name','Email','Role','Branch','Change Branch','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {!profiles.length&&<tr><td colSpan={6} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet — click Add Staff Member to get started</td></tr>}
-                    {profiles.map(p=>{
-                      const br=branches.find(b=>b.id===p.branch_id);
-                      return(
-                        <tr key={p.id}>
-                          <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}</td>
-                          <td style={{...C.td,fontSize:10,color:'#555'}}>{p.email||'—'}</td>
-                          <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td>
-                          <td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td>
-                          <td style={C.td}>
-                            <select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}>
-                              <option value="">— select —</option>
-                              {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-                            </select>
-                          </td>
-                          <td style={C.td}>
-                            <button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Branch staff summary */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-              {branches.map(b=>{
-                const bStaff=profiles.filter(p=>p.branch_id===b.id);
-                return(
-                  <div key={b.id} style={C.card}>
-                    <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{b.name}</div>
-                    <div style={{fontSize:10,color:'#555',marginBottom:10}}>{b.address}</div>
-                    <div style={{fontSize:22,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{bStaff.length}</div>
-                    <div style={{fontSize:10,color:'#555',marginBottom:10}}>staff members</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      {bStaff.map(s=>(
-                        <div key={s.id} style={{fontSize:11,color:'#888',display:'flex',alignItems:'center',gap:6}}>
-                          <span style={{width:6,height:6,borderRadius:'50%',background:roleColor(s.role),display:'inline-block',flexShrink:0}}/>
-                          <span>{s.full_name}</span>
-                          <span style={{fontSize:9,color:'#444'}}>({s.role||'attorney'})</span>
-                        </div>
-                      ))}
-                      {!bStaff.length&&<div style={{fontSize:11,color:'#333'}}>No staff assigned</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ══ INVITE MODAL ════════════════════════════════════════ */}
-        {showInvite&&(
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowInvite(false)}>
-            <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:32,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',marginBottom:4}}>Add Staff Member</div>
-              <div style={{fontSize:11,color:'#555',marginBottom:24}}>Create an account for a new attorney, manager or bookkeeper. Share their temporary password with them — they can change it after logging in.</div>
-              <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                <div>
-                  <label style={lbl}>Full name *</label>
-                  <input className="mb-inp" type="text" placeholder="e.g. Adv. Sarah Nkosi" value={inviteForm.fullName} onChange={e=>setInviteForm(f=>({...f,fullName:e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={lbl}>Email address *</label>
-                  <input className="mb-inp" type="email" placeholder="their@email.com" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                  <div>
-                    <label style={lbl}>Role *</label>
-                    <select className="mb-inp" value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value}))}>
-                      <option value="attorney">Attorney / Fee Earner</option>
-                      <option value="branch_manager">Branch Manager</option>
-                      <option value="manager">National Manager</option>
-                      <option value="bookkeeper">Bookkeeper</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={lbl}>Branch *</label>
-                    <select className="mb-inp" value={inviteForm.branchId} onChange={e=>setInviteForm(f=>({...f,branchId:e.target.value}))}>
-                      <option value="">Select branch...</option>
-                      {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {inviteMsg.msg&&(<div style={{background:inviteMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${inviteMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:inviteMsg.type==='error'?'#E05252':'#8DC63F'}}>{inviteMsg.msg}</div>)}
-                <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>
-                  <button style={C.btn()} onClick={()=>setShowInvite(false)}>Cancel</button>
-                  <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
-                </div>
+              {inviteMsg.msg&&(<div style={{background:inviteMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${inviteMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:inviteMsg.type==='error'?'#E05252':'#8DC63F'}}>{inviteMsg.msg}</div>)}
+              <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>
+                <button style={C.btn()} onClick={()=>setShowInvite(false)}>Cancel</button>
+                <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
               </div>
             </div>
           </div>
-        )}
+        </div>)}
 
       </div>
     </>
   );
-
+}
