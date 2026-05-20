@@ -162,20 +162,12 @@ export default function Manager() {
 });
 const result = await res.json();
 if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
-const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword} — share this via WhatsApp.`,'success');
 setInviting(false);
 setShowInvite(false);
 setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
 load();
 return;
-    if(error){ setInviteMsg({msg:'Error: '+error.message,type:'error'}); setInviting(false); return; }
-    const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ Invitation sent to ${inviteForm.email}. They will receive an email to set their password.`,'success');
-    setInviting(false);
-    setShowInvite(false);
-    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
-    load();
+
   }
 
   const isBranchManager = profile?.role==='branch_manager';
