@@ -378,7 +378,8 @@ const rFormDirty=useRef(false);
   setPwdMsg({msg:'✓ Password changed successfully!',type:'success'});
   setPwdSaving(false);
   setTimeout(()=>{ setShowPwdForm(false); setPwdForm({current:'',newPwd:'',confirm:''}); setPwdMsg({msg:'',type:''}); },2000);
-} const act=[...allActs,...liveActs].find(a=>a.id===id); const units=cls==='billable'?Math.max(1,Math.ceil((act?.duration_seconds||0)/360)):0; await patchActivity(id,{classification:cls,billing_units:units,is_billable:cls==='billable'}); load(); }
+}
+  async function reclassify(id,cls){ const act=[...allActs,...liveActs].find(a=>a.id===id); const units=cls==='billable'?Math.max(1,Math.ceil((act?.duration_seconds||0)/360)):0; await patchActivity(id,{classification:cls,billing_units:units,is_billable:cls==='billable'}); load(); }
   async function assignMatter(actId,matterId){ await patchActivityMatter(actId,matterId); load(); }
 
   async function seedDemo(){
@@ -742,3 +743,4 @@ const rFormDirty=useRef(false);
 
     {viewInv&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 20px'}} onClick={()=>setViewInv(null)}><div style={{background:'#111',border:'1px solid #252525',borderRadius:12,padding:24,maxWidth:780,width:'100%'}} onClick={e=>e.stopPropagation()}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · <span style={{color:'#A78BFA'}}>{viewInv.matter_id||viewInv.matter_name}</span></div></div><div style={{display:'flex',gap:8}}><button style={C.btn('g')} onClick={()=>downloadPDF(viewInv,allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id)))}>⬇ PDF</button><button style={C.btn('r')} onClick={async()=>{if(!confirm(`Delete ${viewInv.id}?`)) return;await deleteInvoice(viewInv.id);setViewInv(null);load();}}>Delete</button><button style={C.btn()} onClick={()=>setViewInv(null)}>Close</button></div></div><InvoiceDoc inv={viewInv} acts={allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id))}/></div></div>)}
   </>);
+}
