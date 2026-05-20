@@ -100,9 +100,9 @@ export async function patchActivityMatter(id, matter) {
 }
  
 // ── Matters ───────────────────────────────────────────────────────────
-export async function fetchMatters(userId) {
+export async function fetchMatters(userId, allMatters=false) {
   let q = supabase.from('matters').select('*').order('created_at', { ascending: false });
-  if (userId) q = q.eq('user_id', userId);
+  if (userId && !allMatters) q = q.eq('user_id', userId);
   const { data, error } = await q;
   if (error) console.error('fetchMatters:', error.message);
   return { matters: data || [] };
