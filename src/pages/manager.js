@@ -155,7 +155,20 @@ export default function Manager() {
     if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
     setInviting(true);
     setInviteMsg({msg:'',type:''});
-    const {error}=await inviteStaff(inviteForm);
+    const res = await fetch('/api/invite', {
+  method: 'POST',
+  headers: {'Content-Type':'application/json'},
+  body: JSON.stringify(inviteForm),
+});
+const result = await res.json();
+if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
+const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
+showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword} — share this via WhatsApp.`,'success');
+setInviting(false);
+setShowInvite(false);
+setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
+load();
+return;
     if(error){ setInviteMsg({msg:'Error: '+error.message,type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
     showAlert(`✓ Invitation sent to ${inviteForm.email}. They will receive an email to set their password.`,'success');
