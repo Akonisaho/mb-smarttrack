@@ -136,7 +136,7 @@ export default function Manager() {
     setMonthActs(data||[]);
   };
 
-  function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),8000); }
+  function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
@@ -333,7 +333,7 @@ export default function Manager() {
         {showInvite&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowInvite(false)}>
           <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:32,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',marginBottom:4}}>Add Staff Member</div>
-            <div style={{fontSize:11,color:'#555',marginBottom:24}}>Create an account. The temporary password will be shown after — share it via WhatsApp.</div>
+            <div style={{fontSize:11,color:'#555',marginBottom:24}}>Create an account. The temporary password will be shown after — share it with the staff member..</div>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               <div><label style={lbl}>Full name *</label><input className="mb-inp" type="text" placeholder="e.g. Adv. Sarah Nkosi" value={inviteForm.fullName} onChange={e=>setInviteForm(f=>({...f,fullName:e.target.value}))}/></div>
               <div><label style={lbl}>Email address *</label><input className="mb-inp" type="email" placeholder="their@email.com" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/></div>
