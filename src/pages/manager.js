@@ -156,19 +156,10 @@ export default function Manager() {
     setInviting(true);
     setInviteMsg({msg:'',type:''});
     const res = await fetch('/api/invite', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(inviteForm),
-    });
-    const result = await res.json();
-    if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
-    const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword} — share via WhatsApp.`,'success');
-    setInviting(false);
-    setShowInvite(false);
-    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
-    load();
-  }
+  method: 'POST',
+  headers: {'Content-Type':'application/json'},
+  body: JSON.stringify(inviteForm),
+});
 const result = await res.json();
 if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
 setInviting(false);
@@ -665,4 +656,4 @@ const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filte
       </div>
     </>
   );
-
+}
