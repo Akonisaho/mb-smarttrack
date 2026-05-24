@@ -164,7 +164,10 @@ export default function Manager() {
       const start = d.toISOString().split('T')[0];
       const endD = new Date(d); endD.setDate(endD.getDate() + 6);
       const end = endD.toISOString().split('T')[0];
-      return invs.filter(i => i.created_at >= start && i.created_at <= end + 'T23:59:59');
+      return invs.filter(i => {
+        const invDate = i.created_at ? i.created_at.substring(0,10) : '';
+        return invDate >= start && invDate <= end;
+      });
     }
     if (overviewPeriod === 'month') return invs.filter(i => i.created_at?.startsWith(selDate.substring(0, 7)));
     return invs;
@@ -276,7 +279,7 @@ export default function Manager() {
             ))}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <button style={C.btn()} onClick={()=>router.push('/')}>← Attorney View</button>
+            
             <div style={C.pill}><div style={C.dot}/>{clock}</div>
             <button style={{...C.btn('r')}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           </div>
