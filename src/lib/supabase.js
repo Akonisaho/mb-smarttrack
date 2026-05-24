@@ -202,11 +202,29 @@ export async function fetchMonthActivities(month, userId) {
 }
  
 // ── Manager ───────────────────────────────────────────────────────────
-export async function fetchManagerSummary(date) {
+export async function fetchManagerSummary(date, period='all') {
   const { data } = await supabase.from('manager_summary').select('*').eq('date', date);
-  const { data: allTime } = await supabase.from('activities').select(
-    'user_id, billing_units, is_billable, duration_seconds'
+  
+  let q = supabase.from('activities').select(
+    'user_id, billing_units, is_billable, duration_seconds, date'
   ).neq('agent_id', 'demo');
+
+  // Filter by period
+  if (period === 'day') {
+    q = q.eq('date', date);
+  } else if (period === 'week') {
+    const d = new Date(date + 'T12:00:00');
+    d.setDate(d.getDate() - d.getDay() + 1);
+    const start = d.toISOString().split('T')[0];
+    const end = new Date(d); end.setDate(d.getDate() + 6);
+    q = q.gte('date', start).lte('date', end.toISOString().split('T')[0]);
+  } else if (period === 'month') {
+    const month = date.substring(0, 7);
+    q = q.gte('date', `${month}-01`).lte('date', `${month}-31`);
+  }
+  // 'all' — no filter, fetch everything
+
+  const { data: allTime } = await q;
   return { summary: data || [], allTime: allTime || [] };
 }
  
