@@ -344,27 +344,83 @@ export default function Manager() {
         </div>)}
 
         {tab==='analytics'&&(<div style={C.main}>
-          <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>Firm Analytics</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-            {[{l:'Total Staff',v:profiles.length,s:'across all branches'},{l:'Total Units',v:allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0),s:'billable units earned'},{l:'Total Billed',v:`R${(invoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0)*1.15).toFixed(2)}`,s:`${invoices.reduce((s,i)=>s+(i.total_units||0),0)} units · incl. VAT`},{l:'Total Unbilled',v:`R${(Math.max(0,allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0)-invoices.reduce((s,i)=>s+(i.total_units||0),0))*rate).toLocaleString()}`,s:`${Math.max(0,allTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0)-invoices.reduce((s,i)=>s+(i.total_units||0),0))} units pending`}].map(({l,v,s})=>(<div key={l} style={C.stat(false,false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
-          </div>
-          <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Attorney','Branch','Billable Time','Units Earned','Units Billed','Unbilled','Est. Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{byAttyAllTime.map(a=>(<tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td></tr>))}</tbody></table></div>
-        </div>)}
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Analytics</div><div style={{fontSize:11,color:'#444'}}>{overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This Week':overviewPeriod==='month'?new Date(selDate.substring(0,7)+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All Time'}</div></div>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+      <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
+      <div style={{display:'flex',background:'#1A1A1A',border:'1px solid #252525',borderRadius:6,padding:2}}>
+        {[['day','Day'],['week','Week'],['month','Month'],['all','All Time']].map(([v,l])=>(
+          <button key={v} style={{background:overviewPeriod===v?'#2A2A2A':'transparent',border:'none',color:overviewPeriod===v?'#F0F0F0':'#555',padding:'4px 12px',borderRadius:5,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:overviewPeriod===v?600:400}} onClick={()=>setOverviewPeriod(v)}>{l}</button>
+        ))}
+      </div>
+      <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+    </div>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+    {[{l:'Total Staff',v:filteredProfiles.length,s:'active staff'},{l:'Billable Time',v:toHm(firmBillSec),s:`${firmAllUnits} units earned`},{l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},{l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`}].map(({l,v,s})=>(<div key={l} style={C.stat(l==='Total Billed',l==='Unbilled Revenue')}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:l==='Total Billed'?'#8DC63F':l==='Unbilled Revenue'?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+  </div>
+  {byAtty.filter(a=>a.all_units>0).length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Billing units per attorney</div><BarChart data={byAtty.filter(a=>a.all_units>0).map(a=>({label:a.full_name.replace('Adv. ','').split(' ')[0],label2:`${a.all_units}u`,value:a.all_units,color:'#8DC63F'}))} height={130}/></div>)}
+  <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Performance</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Attorney','Branch','Billable Time','Units Earned','Units Billed','Unbilled','Est. Value'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!byAtty.length&&<tr><td colSpan={7} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No billable data for this period.</td></tr>}{byAtty.map(a=>(<tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)||'0m'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444',fontWeight:600}}>{a.unbilled_units>0?`R${(a.unbilled_units*rate).toLocaleString()}`:'—'}</td></tr>))}</tbody></table></div>
+</div>)}
 
         {tab==='history'&&(<div style={C.main}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>All attorneys · {histYear}</div></div>
-            <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
-              <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
-            </div>
-          </div>
-          {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-            {histData.map(m=>{ const isSelected=selMonth===m.month,hasFuture=new Date(m.month+'-01')>new Date(); return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}><div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>{m.sessions?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#8DC63F':'#888',marginBottom:2}}>{toHm(m.total_seconds)}</div><div style={{fontSize:10,color:'#555'}}>{m.sessions} sessions</div><div style={{fontSize:11,color:'#8DC63F',marginTop:4,fontWeight:600}}>{m.billable_units} units</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}</div>); })}
-          </div>
-          {selMonth&&monthActs.length>0&&(<div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>{fmonth(selMonth)} · {monthActs.length} sessions</div><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Attorney','Application','Duration','Units','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{monthActs.filter(a=>a.is_billable).map(a=>(<tr key={a.id}><td style={{...C.td,fontSize:10,color:'#555',fontFamily:'monospace'}}>{a.date}</td><td style={{...C.td,color:'#C8C8C8'}}>{a.profiles?.full_name||'—'}</td><td style={{...C.td,color:'#888'}}>{a.app_display_name}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.duration_seconds)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{a.billing_units}</td><td style={C.td}><span style={{color:'#8DC63F',fontSize:9,padding:'2px 8px',border:'1px solid rgba(141,198,63,0.3)',borderRadius:20}}>Billable</span></td></tr>))}</tbody></table></div>)}
-        </div>)}
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>Click a month to see attorney billing details</div></div>
+    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+      <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);setMonthActs([]);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
+      <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+    </div>
+  </div>
+  {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
+  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+    {histData.map(m=>{
+      const isSelected=selMonth===m.month;
+      const hasFuture=new Date(m.month+'-01')>new Date();
+      const revenue=(m.billable_units||0)*rate;
+      return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}>
+        <div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>
+        {m.sessions?(<>
+          <div style={{fontSize:20,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{m.billable_units||0} units</div>
+          <div style={{fontSize:11,color:'#4A90D9',fontWeight:600,marginBottom:2}}>R{revenue.toLocaleString()}</div>
+          <div style={{fontSize:10,color:'#555'}}>est. excl. VAT</div>
+        </>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}
+      </div>);
+    })}
+  </div>
+  {selMonth&&(<div style={C.card}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+      <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{fmonth(selMonth)} — Attorney Billing</div>
+      <button style={{...C.btn(),fontSize:11}} onClick={()=>{setSelMonth(null);setMonthActs([]);}}>✕ Close</button>
+    </div>
+    {!monthActs.filter(a=>a.is_billable).length?(
+      <div style={{textAlign:'center',padding:'30px',color:'#555',fontSize:12}}>No billable activities for this month.</div>
+    ):(()=>{
+      const attyMap={};
+      monthActs.filter(a=>a.is_billable).forEach(a=>{
+        const name=a.profiles?.full_name||'Unknown';
+        if(!attyMap[name]) attyMap[name]={name,billSec:0,units:0};
+        attyMap[name].billSec+=a.duration_seconds||0;
+        attyMap[name].units+=a.billing_units||0;
+      });
+      const attyList=Object.values(attyMap).sort((a,b)=>b.units-a.units);
+      return(<table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead><tr>{['Attorney','Billable Time','Units Earned','Est. Revenue (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+        <tbody>{attyList.map((a,i)=>(<tr key={i}>
+          <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.name}</td>
+          <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.billSec)}</td>
+          <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.units}</td>
+          <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>R{(a.units*rate).toLocaleString()}</td>
+        </tr>))}
+        <tr style={{background:'#0D0D0D'}}>
+          <td style={{...C.th,paddingTop:12}}>Total</td>
+          <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>{toHm(attyList.reduce((s,a)=>s+a.billSec,0))}</td>
+          <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>{attyList.reduce((s,a)=>s+a.units,0)}</td>
+          <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>R{(attyList.reduce((s,a)=>s+a.units,0)*rate).toLocaleString()}</td>
+        </tr></tbody>
+      </table>);
+    })()}
+  </div>)}
+</div>)}
 
         {tab==='invoices'&&(<div style={C.main}>
           <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
