@@ -143,11 +143,15 @@ export default function Manager() {
     try {
       if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
       if (overviewPeriod === 'week') {
-        const d = new Date(selDate + 'T12:00:00');
-        d.setDate(d.getDate() - d.getDay() + 1);
-        const start = d.toISOString().split('T')[0];
-        const end = new Date(d); end.setDate(d.getDate() + 6);
-        return acts.filter(a => a.date >= start && a.date <= end.toISOString().split('T')[0]);
+        const today = new Date();
+        const day = today.getDay() || 7;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - day + 1);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        const start = monday.toLocaleDateString('en-CA');
+        const end = sunday.toLocaleDateString('en-CA');
+        return acts.filter(a => a.date >= start && a.date <= end);
       }
       if (overviewPeriod === 'month') return acts.filter(a => a.date && a.date.startsWith(selDate.substring(0, 7)));
       return acts;
