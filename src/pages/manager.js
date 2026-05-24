@@ -131,10 +131,14 @@ export default function Manager() {
     setSelMonth(month);
     let q=supabase.from('activities').select('*, profiles(full_name)')
       .neq('agent_id','demo')
-      .gte('date',`${month}-01`).lte('date',`${month}-31`)
+      .gte('date',`${month}-01`)
+      .lte('date',`${month}-31`)
+      .eq('is_billable',true)
       .order('start_time',{ascending:true});
     if(attyId) q=q.eq('user_id',attyId);
-    const {data}=await q;
+    const {data,error}=await q;
+    if(error) console.error('loadMonth error:',error.message);
+    console.log('monthActs loaded:',data?.length, data);
     setMonthActs(data||[]);
   };
 
