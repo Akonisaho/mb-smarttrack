@@ -143,14 +143,15 @@ export default function Manager() {
     try {
       if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
       if (overviewPeriod === 'week') {
-        const today = new Date();
-        const day = today.getDay() || 7;
-        const monday = new Date(today);
-        monday.setDate(today.getDate() - day + 1);
+        const d = new Date(selDate + 'T12:00:00');
+        const day = d.getDay() === 0 ? 7 : d.getDay();
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - day + 1);
         const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
         const start = monday.toLocaleDateString('en-CA');
         const end = sunday.toLocaleDateString('en-CA');
+        console.log('Week range:', start, 'to', end);
         return acts.filter(a => a.date >= start && a.date <= end);
       }
       if (overviewPeriod === 'month') return acts.filter(a => a.date && a.date.startsWith(selDate.substring(0, 7)));
@@ -159,7 +160,19 @@ export default function Manager() {
   }
 
   function getPeriodInvoices(invs) {
-    return invs; // invoices always show all time — filter by attorney only
+    if (overviewPeriod === 'all') return invs;
+    if (overviewPeriod === 'day') return invs.filter(i => i.created_at?.substring(0,10) === selDate);
+    if (overviewPeriod === 'week') {
+      const d = new Date(selDate + 'T12:00:00');
+      const day = d.getDay() === 0 ? 7 : d.getDay();
+      const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+      const start = monday.toLocaleDateString('en-CA');
+      const end = sunday.toLocaleDateString('en-CA');
+      return invs.filter(i => { const d = i.created_at?.substring(0,10)||''; return d >= start && d <= end; });
+    }
+    if (overviewPeriod === 'month') return invs.filter(i => i.created_at?.substring(0,7) === selDate.substring(0,7));
+    return invs;
   }
 
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
@@ -191,8 +204,7 @@ export default function Manager() {
   const firmTotalSec   = periodActs.reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmBillSec    = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmAllUnits   = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
-  const periodInvoices = getPeriodInvoices(invoices);
-  const filtInvoices   = selAtty==='all' ? periodInvoices : periodInvoices.filter(i=>i.user_id===selAtty);
+  const filtInvoices   = selAtty==='all' ? invoices : invoices.filter(i=>i.user_id===selAtty);
   const billedUnits    = filtInvoices.reduce((s,i)=>s+(i.total_units||0),0);
   const billedRevenue  = filtInvoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
   const unbilledUnits  = Math.max(0,firmAllUnits-billedUnits);
@@ -202,7 +214,7 @@ export default function Manager() {
   const byAtty=filteredProfiles.map(p=>{
     const allTimeP=allTime.filter(a=>a.user_id===p.id);
     const periodP=getPeriodActs(allTimeP);
-    const attyInvs=filtInvoices.filter(i=>i.user_id===p.id);
+    const attyInvs=getPeriodInvoices(invoices).filter(i=>i.user_id===p.id);
     const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
     const allUnits=periodP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
     const br=branches.find(b=>b.id===p.branch_id);
