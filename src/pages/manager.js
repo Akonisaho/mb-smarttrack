@@ -217,6 +217,15 @@ export default function Manager() {
     return{...p,branch_name:br?.name||'—',total_sec:periodP.reduce((s,a)=>s+(a.duration_seconds||0),0),bill_sec:periodP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0),all_units:allUnits,billed_units:billedU,unbilled_units:Math.max(0,allUnits-billedU),invoiceCount:attyInvs.length};
   }).sort((a,b)=>b.all_units-a.all_units);
 
+  const byAttyAllTime=filteredProfiles.map(p=>{
+    const allTimeP=allTime.filter(a=>a.user_id===p.id);
+    const attyInvs=invoices.filter(i=>i.user_id===p.id);
+    const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
+    const allUnits=allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
+    const br=branches.find(b=>b.id===p.branch_id);
+    return{...p,branch_name:br?.name||'—',bill_sec:allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0),all_units:allUnits,billed_units:billedU,unbilled_units:Math.max(0,allUnits-billedU),invoiceCount:attyInvs.length};
+  }).sort((a,b)=>b.all_units-a.all_units);
+
   const matterMap={};
   filtInvoices.forEach(inv=>{ const key=inv.matter_id||inv.matter_name||'Unknown'; if(!matterMap[key]) matterMap[key]={id:key,name:inv.matter_name||key,client:inv.client||'',invoiceCount:0,billedAmt:0}; matterMap[key].invoiceCount++; matterMap[key].billedAmt+=(inv.total_units||0)*(inv.rate||150); });
   const topMatters=Object.values(matterMap).sort((a,b)=>b.billedAmt-a.billedAmt).slice(0,10);
