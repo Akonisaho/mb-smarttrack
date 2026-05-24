@@ -125,7 +125,7 @@ export default function Login() {
                     tabIndex={-1}
                     title={showPwd ? 'Hide password' : 'Show password'}
                   >
-                    {showPwd ? '🙈' : '👁️'}
+                    {showPwd ? 'Hide' : 'Show'}
                   </button>
                 </div>
                 <div style={{textAlign:'right',marginTop:6}}>
