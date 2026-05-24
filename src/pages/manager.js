@@ -379,13 +379,13 @@ export default function Manager() {
     {histData.map(m=>{
       const isSelected=selMonth===m.month;
       const hasFuture=new Date(m.month+'-01')>new Date();
-      const revenue=(m.billable_units||0)*rate;
+      const revenue=(m.billable_units||0)*rate*1.15;
       return(<div key={m.month} style={{background:isSelected?'rgba(141,198,63,0.08)':m.sessions?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(141,198,63,0.4)':m.sessions?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:m.sessions?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>m.sessions&&loadMonth(m.month,selAtty==='all'?null:selAtty)}>
         <div style={{fontSize:12,fontWeight:600,color:m.sessions?'#D0D0D0':'#333',marginBottom:6}}>{new Date(m.month+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})}</div>
         {m.sessions?(<>
           <div style={{fontSize:20,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{m.billable_units||0} units</div>
           <div style={{fontSize:11,color:'#4A90D9',fontWeight:600,marginBottom:2}}>R{revenue.toLocaleString()}</div>
-          <div style={{fontSize:10,color:'#555'}}>est. excl. VAT</div>
+          <div style={{fontSize:10,color:'#555'}}>est. incl. VAT</div>
         </>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}
       </div>);
     })}
@@ -407,18 +407,18 @@ export default function Manager() {
       });
       const attyList=Object.values(attyMap).sort((a,b)=>b.units-a.units);
       return(<table style={{width:'100%',borderCollapse:'collapse'}}>
-        <thead><tr>{['Attorney','Billable Time','Units Earned','Est. Revenue (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+        <thead><tr>{['Attorney','Billable Time','Units Earned','Est. Revenue (incl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
         <tbody>{attyList.map((a,i)=>(<tr key={i}>
           <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.name}</td>
           <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.billSec)}</td>
           <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.units}</td>
-          <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>R{(a.units*rate).toLocaleString()}</td>
+          <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>R{(a.units*rate*1.15).toFixed(2)}</td>
         </tr>))}
         <tr style={{background:'#0D0D0D'}}>
           <td style={{...C.th,paddingTop:12}}>Total</td>
           <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>{toHm(attyList.reduce((s,a)=>s+a.billSec,0))}</td>
           <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>{attyList.reduce((s,a)=>s+a.units,0)}</td>
-          <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>R{(attyList.reduce((s,a)=>s+a.units,0)*rate).toLocaleString()}</td>
+          <td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>R{(attyList.reduce((s,a)=>s+a.units,0)*rate*1.15).toFixed(2)}</td>
         </tr></tbody>
       </table>);
     })()}
