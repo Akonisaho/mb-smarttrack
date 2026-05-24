@@ -80,11 +80,21 @@ export async function fetchActivities({ date, userId } = {}) {
 }
  
 export async function fetchAllActivities({ userId } = {}) {
-  const { data, error } = await supabase.from('activities').select('*')
-    .not('agent_id', 'eq', 'demo').eq('user_id', userId)
-    .order('start_time', { ascending: false }).limit(2000);
-  if (error) console.error('fetchAllActivities:', error.message);
-  return { activities: data || [] };
+  const [recentRes, billableRes] = await Promise.all([
+    supabase.from('activities').select('*')
+      .not('agent_id', 'eq', 'demo').eq('user_id', userId)
+      .order('start_time', { ascending: false }).limit(2000),
+    supabase.from('activities').select('*')
+      .not('agent_id', 'eq', 'demo').eq('user_id', userId)
+      .eq('is_billable', true)
+      .order('start_time', { ascending: false })
+  ]);
+  if (recentRes.error) console.error('fetchAllActivities:', recentRes.error.message);
+  const recent = recentRes.data || [];
+  const billable = billableRes.data || [];
+  const ids = new Set(recent.map(a => a.id));
+  const merged = [...recent, ...billable.filter(a => !ids.has(a.id))];
+  return { activities: merged };
 }
  
 export async function patchActivity(id, updates) {
