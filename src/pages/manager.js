@@ -144,13 +144,10 @@ export default function Manager() {
       if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
       if (overviewPeriod === 'week') {
         const d = new Date(selDate + 'T12:00:00');
-        const day = d.getDay() || 7;
-        d.setDate(d.getDate() - day + 1);
+        d.setDate(d.getDate() - d.getDay() + 1);
         const start = d.toISOString().split('T')[0];
-        const endD = new Date(d);
-        endD.setDate(endD.getDate() + 6);
-        const end = endD.toISOString().split('T')[0];
-        return acts.filter(a => a.date >= start && a.date <= end);
+        const end = new Date(d); end.setDate(d.getDate() + 6);
+        return acts.filter(a => a.date >= start && a.date <= end.toISOString().split('T')[0]);
       }
       if (overviewPeriod === 'month') return acts.filter(a => a.date && a.date.startsWith(selDate.substring(0, 7)));
       return acts;
@@ -299,7 +296,7 @@ export default function Manager() {
           </div>
           <div style={C.card}>
             <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Leaderboard — {overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This Week':overviewPeriod==='month'?new Date(selDate.substring(0,7)+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All Time'}</div>
-            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['#','Attorney','Branch','Total Time','Billable','Units Earned','Units Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!byAtty.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No data yet.</td></tr>}{byAtty.map((a,i)=>(<tr key={a.id}><td style={{...C.td,color:'#444',fontWeight:600,width:28}}>{i+1}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:600}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{toHm(a.total_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{a.invoiceCount}</td></tr>))}</tbody></table></div>
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['#','Attorney','Branch','Billable Time','Units Earned','Units Billed','Unbilled Units','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!byAtty.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No data yet.</td></tr>}{byAtty.map((a,i)=>(<tr key={a.id}><td style={{...C.td,color:'#444',fontWeight:600,width:28}}>{i+1}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:600}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)||'0m'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{a.invoiceCount}</td></tr>))}</tbody></table></div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
             <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Top Matters by Billed Revenue</div>{!topMatters.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Invoices','Billed'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{topMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td></tr>))}</tbody></table>}</div>
