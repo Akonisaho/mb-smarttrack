@@ -54,6 +54,7 @@ export default function Manager() {
   const [inviting,setInviting]           = useState(false);
   const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
   const rate = 150;
+  const [overviewPeriod, setOverviewPeriod] = useState('day');
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -136,7 +137,27 @@ export default function Manager() {
     setMonthActs(data||[]);
   };
 
-  function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
+  function getPeriodActs(acts) {
+    const today = new Date().toLocaleDateString('en-CA');
+    if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
+    if (overviewPeriod === 'week') {
+      const d = new Date(selDate + 'T12:00:00');
+      d.setDate(d.getDate() - d.getDay() + 1);
+      const start = d.toISOString().split('T')[0];
+      const end = new Date(d); end.setDate(d.getDate() + 6);
+      return acts.filter(a => a.date >= start && a.date <= end.toISOString().split('T')[0]);
+    }
+    if (overviewPeriod === 'month') return acts.filter(a => a.date.startsWith(selDate.substring(0, 7)));
+    return acts; // all time
+  }
+
+  function getPeriodInvoices(invs) {
+    if (overviewPeriod === 'all') return invs;
+    const today = new Date().toLocaleDateString('en-CA');
+    if (overviewPeriod === 'day') return invs.filter(i => i.created_at?.startsWith(selDate));
+    if (overviewPeriod === 'month') return invs.filter(i => i.created_at?.startsWith(selDate.substring(0, 7)));
+    return invs;
+  } setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
@@ -161,9 +182,10 @@ export default function Manager() {
   const myBranch = isBranchManager ? profile?.branch_id : selBranch;
   const filteredProfiles = myBranch==='all'||!myBranch ? profiles : profiles.filter(p=>p.branch_id===myBranch);
   const filteredAllTime = selAtty==='all' ? allTime : allTime.filter(a=>a.user_id===selAtty);
-  const firmTotalSec   = filteredAllTime.reduce((s,a)=>s+(a.duration_seconds||0),0);
-  const firmBillSec    = filteredAllTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
-  const firmAllUnits   = filteredAllTime.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
+  const periodActs     = getPeriodActs(filteredAllTime);
+  const firmTotalSec   = periodActs.reduce((s,a)=>s+(a.duration_seconds||0),0);
+  const firmBillSec    = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
+  const firmAllUnits   = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
   const filtInvoices   = selAtty==='all' ? invoices : invoices.filter(i=>i.user_id===selAtty);
   const billedUnits    = filtInvoices.reduce((s,i)=>s+(i.total_units||0),0);
   const billedRevenue  = filtInvoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
@@ -247,9 +269,14 @@ export default function Manager() {
 
         {tab==='overview'&&(<div style={C.main}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div><div style={{fontSize:11,color:'#444'}}>{fdate(selDate)} · {profiles.length} staff · {branches.length} branches</div></div>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div><div style={{fontSize:11,color:'#444'}}>{overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This week':overviewPeriod==='month'?new Date(selDate+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All time'} · {profiles.length} staff · {branches.length} branches</div></div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
               <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
+              <div style={{display:'flex',background:'#1A1A1A',border:'1px solid #252525',borderRadius:6,padding:2}}>
+                {[['day','Day'],['week','Week'],['month','Month'],['all','All Time']].map(([v,l])=>(
+                  <button key={v} style={{background:overviewPeriod===v?'#2A2A2A':'transparent',border:'none',color:overviewPeriod===v?'#F0F0F0':'#555',padding:'4px 12px',borderRadius:5,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:overviewPeriod===v?600:400}} onClick={()=>setOverviewPeriod(v)}>{l}</button>
+                ))}
+              </div>
               {!isBranchManager&&(<select style={C.sel} value={selBranch} onChange={e=>{setSelBranch(e.target.value);setSelAtty('all');}}><option value="all">All branches</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>)}
               {isBranchManager&&(<span style={{fontSize:12,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'5px 12px',borderRadius:6}}>{branches.find(b=>b.id===profile?.branch_id)?.name||'Your branch'}</span>)}
               <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
@@ -353,4 +380,4 @@ export default function Manager() {
       </div>
     </>
   );
-}
+
