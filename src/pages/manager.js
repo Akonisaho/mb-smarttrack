@@ -155,22 +155,7 @@ export default function Manager() {
   }
 
   function getPeriodInvoices(invs) {
-    if (overviewPeriod === 'all') return invs;
-    if (overviewPeriod === 'day') return invs.filter(i => i.created_at?.startsWith(selDate));
-    if (overviewPeriod === 'week') {
-      const d = new Date(selDate + 'T12:00:00');
-      const day = d.getDay() || 7;
-      d.setDate(d.getDate() - day + 1);
-      const start = d.toISOString().split('T')[0];
-      const endD = new Date(d); endD.setDate(endD.getDate() + 6);
-      const end = endD.toISOString().split('T')[0];
-      return invs.filter(i => {
-        const invDate = i.created_at ? i.created_at.substring(0,10) : '';
-        return invDate >= start && invDate <= end;
-      });
-    }
-    if (overviewPeriod === 'month') return invs.filter(i => i.created_at?.startsWith(selDate.substring(0, 7)));
-    return invs;
+    return invs; // invoices always show all time — filter by attorney only
   }
 
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
