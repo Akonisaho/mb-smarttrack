@@ -138,16 +138,19 @@ export default function Manager() {
   };
 
   function getPeriodActs(acts) {
-    if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
-    if (overviewPeriod === 'week') {
-      const d = new Date(selDate + 'T12:00:00');
-      d.setDate(d.getDate() - d.getDay() + 1);
-      const start = d.toISOString().split('T')[0];
-      const end = new Date(d); end.setDate(d.getDate() + 6);
-      return acts.filter(a => a.date >= start && a.date <= end.toISOString().split('T')[0]);
-    }
-    if (overviewPeriod === 'month') return acts.filter(a => a.date.startsWith(selDate.substring(0, 7)));
-    return acts; // all time
+    if(!acts||!acts.length) return [];
+    try {
+      if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
+      if (overviewPeriod === 'week') {
+        const d = new Date(selDate + 'T12:00:00');
+        d.setDate(d.getDate() - d.getDay() + 1);
+        const start = d.toISOString().split('T')[0];
+        const end = new Date(d); end.setDate(d.getDate() + 6);
+        return acts.filter(a => a.date >= start && a.date <= end.toISOString().split('T')[0]);
+      }
+      if (overviewPeriod === 'month') return acts.filter(a => a.date && a.date.startsWith(selDate.substring(0, 7)));
+      return acts;
+    } catch(e) { return acts; }
   }
 
   function getPeriodInvoices(invs) {
