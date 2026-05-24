@@ -138,7 +138,6 @@ export default function Manager() {
   };
 
   function getPeriodActs(acts) {
-    const today = new Date().toLocaleDateString('en-CA');
     if (overviewPeriod === 'day') return acts.filter(a => a.date === selDate);
     if (overviewPeriod === 'week') {
       const d = new Date(selDate + 'T12:00:00');
@@ -153,7 +152,6 @@ export default function Manager() {
 
   function getPeriodInvoices(invs) {
     if (overviewPeriod === 'all') return invs;
-    const today = new Date().toLocaleDateString('en-CA');
     if (overviewPeriod === 'day') return invs.filter(i => i.created_at?.startsWith(selDate));
     if (overviewPeriod === 'month') return invs.filter(i => i.created_at?.startsWith(selDate.substring(0, 7)));
     return invs;
@@ -186,7 +184,8 @@ export default function Manager() {
   const firmTotalSec   = periodActs.reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmBillSec    = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmAllUnits   = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
-  const filtInvoices   = selAtty==='all' ? invoices : invoices.filter(i=>i.user_id===selAtty);
+  const periodInvoices = getPeriodInvoices(invoices);
+  const filtInvoices   = selAtty==='all' ? periodInvoices : periodInvoices.filter(i=>i.user_id===selAtty);
   const billedUnits    = filtInvoices.reduce((s,i)=>s+(i.total_units||0),0);
   const billedRevenue  = filtInvoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
   const unbilledUnits  = Math.max(0,firmAllUnits-billedUnits);
@@ -194,7 +193,7 @@ export default function Manager() {
   const totalTrustHeld = Object.values(trustBalances).reduce((s,v)=>s+v,0);
 
   const byAtty=filteredProfiles.map(p=>{
-    const allTimeP=allTime.filter(a=>a.user_id===p.id);
+    const allTimeP=getPeriodActs(allTime.filter(a=>a.user_id===p.id));
     const attyInvs=invoices.filter(i=>i.user_id===p.id);
     const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
     const allUnits=allTimeP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
