@@ -129,17 +129,16 @@ export default function Manager() {
 
   const loadMonth=async(month,attyId)=>{
     setSelMonth(month);
-    let q=supabase.from('activities').select('*, profiles(full_name)')
+    let q=supabase.from('activities').select('user_id,date,duration_seconds,billing_units,is_billable')
       .neq('agent_id','demo')
       .gte('date',`${month}-01`)
       .lte('date',`${month}-31`)
       .eq('is_billable',true)
-      .order('start_time',{ascending:true});
+      .order('date',{ascending:true});
     if(attyId) q=q.eq('user_id',attyId);
     const {data,error}=await q;
     if(error) console.error('loadMonth error:',error.message);
-    console.log('monthActs loaded:',data?.length, data);
-    setMonthActs(data||[]);
+    setMonthActs((data||[]).map(a=>({...a,profiles:{full_name:profiles.find(p=>p.id===a.user_id)?.full_name||'Unknown'}})));
   };
 
   function getPeriodActs(acts) {
