@@ -74,7 +74,7 @@ export default function Manager() {
 
   const load = useCallback(async()=>{
     const [sumRes,profRes,invRes,branchRes,trustRes,matRes] = await Promise.all([
-      fetchManagerSummary(selDate, overviewPeriod),
+      fetchManagerSummary(selDate),
       fetchAllProfiles(),
       fetchInvoices(null),
       supabase.from('branches').select('*').eq('is_active',true).order('name'),
@@ -100,7 +100,7 @@ export default function Manager() {
   },[selDate]);
 
   useEffect(()=>{ if(!loading){ load(); const t=setInterval(load,30000); return()=>clearInterval(t); } },[loading,load]);
-useEffect(()=>{ if(!loading) load(); },[overviewPeriod,selDate]);
+
 
   useEffect(()=>{
     if(tab!=='history') return;
