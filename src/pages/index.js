@@ -355,14 +355,31 @@ const rFormDirty=useRef(false);
   async function postTransfer(){
     if(!tForm.date||!tForm.amount||!tForm.matterId){ showTrustAlert('Please fill in all required fields.','error'); return; }
     if(isLocked(tForm.date)){ showTrustAlert(`Period ${tForm.date.substring(0,7)} is locked.`,'error'); return; }
-    const amount=parseFloat(tForm.amount);
-    if(isNaN(amount)||amount<=0){ showTrustAlert('Enter a valid amount.','error'); return; }
+    const amountExclVAT=parseFloat(tForm.amount);
+    if(isNaN(amountExclVAT)||amountExclVAT<=0){ showTrustAlert('Enter a valid amount.','error'); return; }
+    const vatAmount=parseFloat((amountExclVAT*0.15).toFixed(2));
+    const totalAmount=parseFloat((amountExclVAT+vatAmount).toFixed(2));
     const bal=getMatterBalance(tForm.matterId);
-    if(amount>bal){ showTrustAlert(`✗ Insufficient balance. Available: ${fmtR(bal)}.`,'error'); return; }
+    if(totalAmount>bal){ showTrustAlert(`✗ Insufficient balance. Available: ${fmtR(bal)} — Required incl. VAT: ${fmtR(totalAmount)}.`,'error'); return; }
     setTrustSaving(true);
-    const {error}=await supabase.from('trust_transactions').insert([{type:'transfer',matter_id:tForm.matterId,user_id:userId,date:tForm.date,amount,trust_account_id:tForm.fromAccountId||null,to_account:tForm.toAccount,invoice_id:tForm.invoiceId,narration:tForm.narration||`Transfer of fees — ${tForm.matterId}`,captured_by:userId,branch_id:tForm.branchId||null,status:'posted'}]);
+    const {error}=await supabase.from('trust_transactions').insert([{
+      type:'transfer',
+      matter_id:tForm.matterId,
+      user_id:userId,
+      date:tForm.date,
+      amount:totalAmount,
+      amount_excl_vat:amountExclVAT,
+      vat_amount:vatAmount,
+      trust_account_id:tForm.fromAccountId||null,
+      to_account:tForm.toAccount,
+      invoice_id:tForm.invoiceId,
+      narration:tForm.narration||`Transfer of fees — ${tForm.matterId}`,
+      captured_by:userId,
+      branch_id:tForm.branchId||null,
+      status:'posted'
+    }]);
     if(error){ showTrustAlert('Error: '+error.message,'error'); setTrustSaving(false); return; }
-    showTrustAlert(`✓ Transfer of ${fmtR(amount)} posted. Both legs recorded.`,'success');
+    showTrustAlert(`✓ Transfer posted — Fees: ${fmtR(amountExclVAT)} + VAT: ${fmtR(vatAmount)} = Total: ${fmtR(totalAmount)} deducted from trust.`,'success');
     setTForm(f=>({...f,amount:'',matterId:'',invoiceId:'',narration:''}));
     setTBalanceCheck(null); setTrustSaving(false); loadTrust();
   }
@@ -605,7 +622,17 @@ const rFormDirty=useRef(false);
           <div style={{display:'flex',flexDirection:'column',gap:12}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>Date *</label><input type="date" style={C.tinp} value={tForm.date} onChange={e=>setTForm(f=>({...f,date:e.target.value}))}/>{isLocked(tForm.date)&&<div style={{fontSize:10,color:'#E05252',marginTop:4}}>⚠ Period locked</div>}</div><div><label style={C.lbl}>Amount (ZAR) *</label><input type="text" inputMode="decimal" style={C.tinp} placeholder="0.00" defaultValue={tForm.amount} onBlur={e=>{ const v=e.target.value.replace(/[^0-9.]/g,''); e.target.value=v; setTForm(f=>({...f,amount:v})); checkTransferBalance(tForm.matterId,v); }}/></div></div>
             <div><label style={C.lbl}>Matter *</label><select style={C.tinp} value={tForm.matterId} onChange={e=>{ setTForm(f=>({...f,matterId:e.target.value,invoiceId:'',amount:''})); checkTransferBalance(e.target.value,tForm.amount); }}><option value="">Select matter...</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} — {m.client} (bal: {fmtR(getMatterBalance(m.id))})</option>)}</select></div>
-            {tBalanceCheck&&(<div style={{background:tBalanceCheck.ok?'rgba(108,192,74,0.08)':'rgba(220,80,80,0.08)',border:`1px solid ${tBalanceCheck.ok?'rgba(108,192,74,0.3)':'rgba(220,80,80,0.3)'}`,borderRadius:6,padding:'8px 12px',fontSize:12,color:tBalanceCheck.ok?'#6CC04A':'#E05252'}}>{tBalanceCheck.ok?`✓ After transfer: ${fmtR(tBalanceCheck.bal-tBalanceCheck.amt)}`:`✗ Insufficient — available: ${fmtR(tBalanceCheck.bal)}`}</div>)}
+            {tBalanceCheck&&(<div style={{background:tBalanceCheck.ok?'rgba(108,192,74,0.08)':'rgba(220,80,80,0.08)',border:`1px solid ${tBalanceCheck.ok?'rgba(108,192,74,0.3)':'rgba(220,80,80,0.3)'}`,borderRadius:6,padding:'8px 12px',fontSize:12,color:tBalanceCheck.ok?'#6CC04A':'#E05252'}}>
+  {tBalanceCheck.ok?(
+    <div>
+      <div>✓ Available: {fmtR(tBalanceCheck.bal)}</div>
+      <div style={{marginTop:4,fontSize:11,color:'#888'}}>
+        Excl. VAT: {fmtR(tBalanceCheck.amt)} + VAT 15%: {fmtR(tBalanceCheck.amt*0.15)} = <strong style={{color:'#EAB308'}}>Total from trust: {fmtR(tBalanceCheck.amt*1.15)}</strong>
+      </div>
+      <div style={{marginTop:2,fontSize:11,color:'#555'}}>After transfer: {fmtR(tBalanceCheck.bal-tBalanceCheck.amt*1.15)}</div>
+    </div>
+  ):`✗ Insufficient — available: ${fmtR(tBalanceCheck.bal)}, required incl. VAT: ${fmtR(tBalanceCheck.amt*1.15)}`}
+</div>)}
             {tForm.matterId&&getMatterInvoices(tForm.matterId).length>0&&(<div><label style={C.lbl}>Link to invoice (auto-fills amount)</label><select style={C.tinp} value={tForm.invoiceId} onChange={e=>{ const inv=invoices.find(i=>i.id===e.target.value); const amt=inv?String(((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)):''; setTForm(f=>({...f,invoiceId:e.target.value,amount:amt,narration:inv?`Transfer of fees — ${inv.matter_name} — ${inv.id}`:''})); if(inv) checkTransferBalance(tForm.matterId,amt); }}><option value="">Select invoice (optional)...</option>{getMatterInvoices(tForm.matterId).map(i=><option key={i.id} value={i.id}>{i.id} — R{((i.total_units||0)*(i.rate||150)*1.15).toFixed(2)} incl. VAT</option>)}</select><div style={{fontSize:10,color:'#555',marginTop:4}}>Selecting an invoice auto-fills the amount</div></div>)}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><div><label style={C.lbl}>From trust account</label><select style={C.tinp} value={tForm.fromAccountId} onChange={e=>setTForm(f=>({...f,fromAccountId:e.target.value}))}>{trustAccounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label style={C.lbl}>To business account</label><select style={C.tinp} value={tForm.toAccount} onChange={e=>setTForm(f=>({...f,toAccount:e.target.value}))}><option value="FNB Business">FNB Business Account</option><option value="ABSA Business">ABSA Business Account</option></select></div></div>
             <div><label style={C.lbl}>Narration</label><input style={C.tinp} placeholder="e.g. Transfer of professional fees" defaultValue={tForm.narration} onBlur={e=>setTForm(f=>({...f,narration:e.target.value}))}/></div>
