@@ -74,7 +74,7 @@ function DonutChart({segments,size=140}){
   if(!total) return <div style={{width:size,height:size,display:'flex',alignItems:'center',justifyContent:'center',color:'#333',fontSize:11}}>No data</div>;
   const r=45,cx=size/2,cy=size/2,sw=18; let angle=-90;
   const arcs=segments.filter(s=>s.value>0).map(seg=>{ const p=seg.value/total,a1=angle,a2=angle+p*360; angle=a2; return{...seg,pct:Math.round(p*100)}; });
-  return(<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}><circle cx={cx} cy={cy} r={r} fill="none" stroke="#1A1A1A" strokeWidth={sw}/>{arcs.map((a,i)=>(<circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={sw} strokeDasharray={`${a.pct*2.827} 282.7`} strokeDashoffset={`${282.7*(1-arcs.slice(0,i).reduce((s,x)=>s+x.pct,0)/100)}`} strokeLinecap="butt"/>))}<text x={cx} y={cy-5} textAnchor="middle" fill="#F0F0F0" fontSize="13" fontWeight="700">{arcs[0]?.pct||0}%</text><text x={cx} y={cy+10} textAnchor="middle" fill="#555" fontSize="9">billable</text></svg>);
+  return(<svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}><circle cx={cx} cy={cy} r={r} fill="none" stroke="#1A1A1A" strokeWidth={sw}/>{arcs.map((a,i)=>(<circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={sw} strokeDasharray={`${a.pct*2.827} 282.7`} strokeDashoffset={`${282.7*(1-arcs.slice(0,i).reduce((s,x)=>s+x.pct,0)/100)}`} strokeLinecap="butt"/>))}<text x={cx} y={cy-5} textAnchor="middle" fill="#F0F0F0" fontSize="13" fontWeight="700">{arcs.find(a=>a.color==='#6CC04A')?.pct||0}%</text><text x={cx} y={cy+10} textAnchor="middle" fill="#555" fontSize="9">billable</text></svg>);
 }
 
 export default function App() {
