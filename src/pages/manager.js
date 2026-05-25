@@ -207,7 +207,7 @@ export default function Manager() {
   const firmTotalSec   = periodActs.reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmBillSec    = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0);
   const firmAllUnits   = periodActs.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
-  const filtInvoices   = selAtty==='all' ? invoices : invoices.filter(i=>i.user_id===selAtty);
+  const filtInvoices   = getPeriodInvoices(selAtty==='all' ? invoices : invoices.filter(i=>i.user_id===selAtty));
   const billedUnits    = filtInvoices.reduce((s,i)=>s+(i.total_units||0),0);
   const billedRevenue  = filtInvoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
   const unbilledUnits  = Math.max(0,firmAllUnits-billedUnits);
@@ -217,7 +217,7 @@ export default function Manager() {
   const byAtty=filteredProfiles.map(p=>{
     const allTimeP=allTime.filter(a=>a.user_id===p.id);
     const periodP=getPeriodActs(allTimeP);
-    const attyInvs=getPeriodInvoices(invoices).filter(i=>i.user_id===p.id);
+    const attyInvs=invoices.filter(i=>i.user_id===p.id);
     const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
     const allUnits=periodP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
     const br=branches.find(b=>b.id===p.branch_id);
