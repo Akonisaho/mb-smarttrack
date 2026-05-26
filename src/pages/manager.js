@@ -425,6 +425,39 @@ export default function Manager() {
   </div>)}
 </div>)}
 
+        {tab==='wip'&&(<div style={C.main}>
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Work In Progress — WIP Report</div><div style={{fontSize:11,color:'#444'}}>Billable work not yet invoiced · {new Date().toLocaleDateString('en-ZA',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</div></div>
+    <div style={{display:'flex',gap:8,alignItems:'center'}}><select style={C.sel} value={selBranch} onChange={e=>setSelBranch(e.target.value)}><option value="all">All branches</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></div>
+  </div>
+  {(()=>{
+    const wipData=filteredProfiles.map(p=>{
+      const attyActs=allTime.filter(a=>a.user_id===p.id&&a.is_billable);
+      const attyInvs=invoices.filter(i=>i.user_id===p.id);
+      const earnedUnits=attyActs.reduce((s,a)=>s+(a.billing_units||0),0);
+      const billedUnits=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
+      const unbilledUnits=Math.max(0,earnedUnits-billedUnits);
+      const attyRate=p.rate||150;
+      const estValue=unbilledUnits*attyRate;
+      const matterMap={};
+      attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
+      attyInvs.forEach(i=>{ if(!i.matter_id) return; if(!matterMap[i.matter_id]) matterMap[i.matter_id]={matterId:i.matter_id,units:0,billedUnits:0}; matterMap[i.matter_id].billedUnits+=i.total_units||0; });
+      const wipMatters=Object.values(matterMap).map(m=>({...m,unbilled:Math.max(0,m.units-m.billedUnits),matter:matters.find(x=>x.id===m.matterId)})).filter(m=>m.unbilled>0);
+      return{...p,earnedUnits,billedUnits,unbilledUnits,estValue,attyRate,wipMatters};
+    }).filter(p=>p.unbilledUnits>0).sort((a,b)=>b.estValue-a.estValue);
+    const totalUnbilled=wipData.reduce((s,p)=>s+p.unbilledUnits,0);
+    const totalValue=wipData.reduce((s,p)=>s+p.estValue,0);
+    return(<>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Attorneys with unbilled work',v:wipData.length,s:'need to invoice'},{l:'Total unbilled units',v:totalUnbilled,s:'across all matters'},{l:'Total unbilled value',v:`R${totalValue.toLocaleString()}`,s:'excl. VAT',a:true}].map(({l,v,s,a})=>(<div key={l} style={C.stat(false,a)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+      </div>
+      {!wipData.length?(<div style={{...C.card,textAlign:'center',padding:'40px',color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>✅</div><div style={{fontSize:14}}>All billable work has been invoiced</div><div style={{fontSize:11,color:'#444',marginTop:6}}>No outstanding WIP</div></div>):wipData.map(p=>(<div key={p.id} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{p.full_name}</div><div style={{fontSize:10,color:'#555'}}>{p.email} · {branches.find(b=>b.id===p.branch_id)?.name||'—'}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Earned</div><div style={{fontSize:16,fontWeight:700,color:'#888'}}>{p.earnedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Billed</div><div style={{fontSize:16,fontWeight:700,color:'#8DC63F'}}>{p.billedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Unbilled</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>{p.unbilledUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Est. Value</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>R{p.estValue.toLocaleString()}</div></div></div></div>
+        {p.wipMatters.length>0&&(<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Units Earned','Units Billed','Unbilled','Est. Value (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{p.wipMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.matterId}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.matter?.client||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#888'}}>{m.units}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{m.billedUnits||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#EAB308',fontWeight:700}}>{m.unbilled}</td><td style={{...C.td,fontFamily:'monospace',color:'#EAB308',fontWeight:700}}>R{(m.unbilled*p.attyRate).toLocaleString()}</td></tr>))}</tbody></table>)}
+      </div>))}
+    </>);
+  })()}
+</div>)}
+
         {tab==='invoices'&&(<div style={C.main}>
           <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
           <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!filtInvoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}{filtInvoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}{filtInvoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td></tr>)}</tbody></table></div>
