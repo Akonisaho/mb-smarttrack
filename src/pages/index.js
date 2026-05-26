@@ -243,7 +243,7 @@ const rFormDirty=useRef(false);
   },[userId]);
 
   useEffect(()=>{ 
-  if(tab==='trust'&&userId){ 
+  if((tab==='trust'||tab==='invoices')&&userId){ 
     loadTrust(); 
     const t=setInterval(loadTrust,300000);
     return()=>clearInterval(t);
