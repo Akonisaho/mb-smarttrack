@@ -276,7 +276,7 @@ export default function Manager() {
             </div>
           </div>
           <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['staff','Staff']].map(([v,l])=>(
+            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['wip','WIP'],['staff','Staff']].map(([v,l])=>(
               <button key={v} style={{...C.ntab(tab===v),position:'relative',color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent'}} onClick={()=>setTab(v)}>
                 {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
               </button>
