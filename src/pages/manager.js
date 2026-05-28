@@ -440,10 +440,15 @@ export default function Manager() {
       const attyRate=p.rate||150;
       const estValue=unbilledUnits*attyRate;
       const matterMap={};
-      attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
+      const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
+attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
       attyInvs.forEach(i=>{ if(!i.matter_id) return; if(!matterMap[i.matter_id]) matterMap[i.matter_id]={matterId:i.matter_id,units:0,billedUnits:0}; matterMap[i.matter_id].billedUnits+=i.total_units||0; });
       const wipMatters=Object.values(matterMap).map(m=>({...m,unbilled:Math.max(0,m.units-m.billedUnits),matter:matters.find(x=>x.id===m.matterId)})).filter(m=>m.unbilled>0);
-      return{...p,earnedUnits,billedUnits,unbilledUnits,estValue,attyRate,wipMatters};
+      const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
+      if(unassignedUnits>0) wipMatters.push({matterId:'—',units:unassignedUnits,billedUnits:0,unbilled:unassignedUnits,matter:{client:'⚠ No matter assigned — needs attention'}});
+      const totalEarned=earnedUnits+unassignedUnits;
+      const totalUnbilled=Math.max(0,totalEarned-billedUnits);
+      return{...p,earnedUnits:totalEarned,billedUnits,unbilledUnits:totalUnbilled,estValue:totalUnbilled*attyRate,attyRate,wipMatters};
     }).filter(p=>p.unbilledUnits>0).sort((a,b)=>b.estValue-a.estValue);
     const totalUnbilled=wipData.reduce((s,p)=>s+p.unbilledUnits,0);
     const totalValue=wipData.reduce((s,p)=>s+p.estValue,0);
