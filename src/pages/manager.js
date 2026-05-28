@@ -440,8 +440,7 @@ export default function Manager() {
       const attyRate=p.rate||150;
       const estValue=unbilledUnits*attyRate;
       const matterMap={};
-      const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
-attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
+      attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
       attyInvs.forEach(i=>{ if(!i.matter_id) return; if(!matterMap[i.matter_id]) matterMap[i.matter_id]={matterId:i.matter_id,units:0,billedUnits:0}; matterMap[i.matter_id].billedUnits+=i.total_units||0; });
       const wipMatters=Object.values(matterMap).map(m=>({...m,unbilled:Math.max(0,m.units-m.billedUnits),matter:matters.find(x=>x.id===m.matterId)})).filter(m=>m.unbilled>0);
       const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
