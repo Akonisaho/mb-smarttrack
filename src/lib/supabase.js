@@ -217,7 +217,7 @@ export async function fetchManagerSummary(date, period='all') {
   
   // Always fetch ALL activities — frontend handles period filtering
   const { data: allTime } = await supabase.from('activities').select(
-    'user_id, billing_units, is_billable, duration_seconds, date'
+    'user_id, billing_units, is_billable, duration_seconds, date, matter'
   ).neq('agent_id', 'demo');
 
   return { summary: data || [], allTime: allTime || [] };

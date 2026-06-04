@@ -300,7 +300,7 @@ export default function Manager() {
 
         {tab==='overview'&&(<div style={C.main}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div><div style={{fontSize:11,color:'#444'}}>{overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This week':overviewPeriod==='month'?new Date(selDate+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All time'} · {profiles.length} staff · {branches.length} branches</div></div>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Overview — Motsoeneng Bill</div><div style={{fontSize:11,color:'#444'}}>{overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This week':overviewPeriod==='month'?new Date(selDate.substring(0,7)+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All time'} · {profiles.length} staff · {branches.length} branches</div></div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
               <input type="date" style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
               <div style={{display:'flex',background:'#1A1A1A',border:'1px solid #252525',borderRadius:6,padding:2}}>
@@ -445,7 +445,7 @@ export default function Manager() {
       const wipMatters=Object.values(matterMap).map(m=>({...m,unbilled:Math.max(0,m.units-m.billedUnits),matter:matters.find(x=>x.id===m.matterId)})).filter(m=>m.unbilled>0);
       const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
       if(unassignedUnits>0) wipMatters.push({matterId:'—',units:unassignedUnits,billedUnits:0,unbilled:unassignedUnits,matter:{client:'⚠ No matter assigned — needs attention'}});
-      const totalEarned=earnedUnits+unassignedUnits;
+      const totalEarned=earnedUnits;
       const totalUnbilled=Math.max(0,totalEarned-billedUnits);
       return{...p,earnedUnits:totalEarned,billedUnits,unbilledUnits:totalUnbilled,estValue:totalUnbilled*attyRate,attyRate,wipMatters};
     }).filter(p=>p.unbilledUnits>0).sort((a,b)=>b.estValue-a.estValue);
