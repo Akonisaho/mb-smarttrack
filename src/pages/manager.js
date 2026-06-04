@@ -217,11 +217,16 @@ export default function Manager() {
   const byAtty=filteredProfiles.map(p=>{
     const allTimeP=allTime.filter(a=>a.user_id===p.id);
     const periodP=getPeriodActs(allTimeP);
+    const periodBill=periodP.filter(a=>a.is_billable);
     const attyInvs=getPeriodInvoices(invoices).filter(i=>i.user_id===p.id);
     const billedU=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
-    const allUnits=periodP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.billing_units||0),0);
+    const allUnits=periodBill.reduce((s,a)=>s+(a.billing_units||0),0);
+    const mMap={};
+    periodBill.forEach(a=>{if(!a.matter)return;if(!mMap[a.matter])mMap[a.matter]={units:0,billedUnits:0};mMap[a.matter].units+=a.billing_units||0;});
+    attyInvs.forEach(i=>{if(!i.matter_id)return;if(!mMap[i.matter_id])mMap[i.matter_id]={units:0,billedUnits:0};mMap[i.matter_id].billedUnits+=i.total_units||0;});
+    const unbilledU=Object.values(mMap).reduce((s,m)=>s+Math.max(0,m.units-m.billedUnits),0)+periodBill.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
     const br=branches.find(b=>b.id===p.branch_id);
-    return{...p,branch_name:br?.name||'—',total_sec:periodP.reduce((s,a)=>s+(a.duration_seconds||0),0),bill_sec:periodP.filter(a=>a.is_billable).reduce((s,a)=>s+(a.duration_seconds||0),0),all_units:allUnits,billed_units:billedU,unbilled_units:Math.max(0,allUnits-billedU),invoiceCount:attyInvs.length};
+    return{...p,branch_name:br?.name||'—',total_sec:periodP.reduce((s,a)=>s+(a.duration_seconds||0),0),bill_sec:periodBill.reduce((s,a)=>s+(a.duration_seconds||0),0),all_units:allUnits,billed_units:billedU,unbilled_units:unbilledU,invoiceCount:attyInvs.length};
   }).sort((a,b)=>b.all_units-a.all_units);
 
   const byAttyAllTime=filteredProfiles.map(p=>{
@@ -436,18 +441,15 @@ export default function Manager() {
       const attyInvs=invoices.filter(i=>i.user_id===p.id);
       const earnedUnits=attyActs.reduce((s,a)=>s+(a.billing_units||0),0);
       const billedUnits=attyInvs.reduce((s,i)=>s+(i.total_units||0),0);
-      const unbilledUnits=Math.max(0,earnedUnits-billedUnits);
       const attyRate=p.rate||150;
-      const estValue=unbilledUnits*attyRate;
       const matterMap={};
       attyActs.forEach(a=>{ if(!a.matter) return; if(!matterMap[a.matter]) matterMap[a.matter]={matterId:a.matter,units:0,billedUnits:0}; matterMap[a.matter].units+=a.billing_units||0; });
       attyInvs.forEach(i=>{ if(!i.matter_id) return; if(!matterMap[i.matter_id]) matterMap[i.matter_id]={matterId:i.matter_id,units:0,billedUnits:0}; matterMap[i.matter_id].billedUnits+=i.total_units||0; });
       const wipMatters=Object.values(matterMap).map(m=>({...m,unbilled:Math.max(0,m.units-m.billedUnits),matter:matters.find(x=>x.id===m.matterId)})).filter(m=>m.unbilled>0);
       const unassignedUnits=attyActs.filter(a=>!a.matter).reduce((s,a)=>s+(a.billing_units||0),0);
       if(unassignedUnits>0) wipMatters.push({matterId:'—',units:unassignedUnits,billedUnits:0,unbilled:unassignedUnits,matter:{client:'⚠ No matter assigned — needs attention'}});
-      const totalEarned=earnedUnits;
-      const totalUnbilled=Math.max(0,totalEarned-billedUnits);
-      return{...p,earnedUnits:totalEarned,billedUnits,unbilledUnits:totalUnbilled,estValue:totalUnbilled*attyRate,attyRate,wipMatters};
+      const totalUnbilled=wipMatters.reduce((s,m)=>s+m.unbilled,0);
+      return{...p,earnedUnits,billedUnits,unbilledUnits:totalUnbilled,estValue:totalUnbilled*attyRate,attyRate,wipMatters};
     }).filter(p=>p.unbilledUnits>0).sort((a,b)=>b.estValue-a.estValue);
     const totalUnbilled=wipData.reduce((s,p)=>s+p.unbilledUnits,0);
     const totalValue=wipData.reduce((s,p)=>s+p.estValue,0);
