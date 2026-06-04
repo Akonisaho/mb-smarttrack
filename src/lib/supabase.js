@@ -232,6 +232,54 @@ export async function fetchAllProfiles() {
   return { profiles: data || [] };
 }
  
+// ── Calendar ──────────────────────────────────────────────────────────
+export async function fetchCalendarEvents({ userId, isManager, startDate, endDate } = {}) {
+  let q = supabase.from('calendar_events').select('*').order('start_date').order('start_time', { nullsFirst: true });
+  if (startDate) q = q.gte('start_date', startDate);
+  if (endDate)   q = q.lte('start_date', endDate);
+  if (!isManager && userId) q = q.or(`user_id.eq.${userId},is_firm_wide.eq.true`);
+  const { data, error } = await q;
+  if (error) console.error('fetchCalendarEvents:', error.message);
+  return { events: data || [] };
+}
+
+export async function saveCalendarEvent(event, userId) {
+  const payload = { ...event, updated_at: new Date().toISOString() };
+  const { data, error } = event.id
+    ? await supabase.from('calendar_events').update(payload).eq('id', event.id).select()
+    : await supabase.from('calendar_events').insert([{ ...payload, created_by: userId }]).select();
+  if (error) console.error('saveCalendarEvent:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteCalendarEvent(id) {
+  const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+  if (error) console.error('deleteCalendarEvent:', error.message);
+  return { error };
+}
+
+// ── Invoice Payments ──────────────────────────────────────────────────
+export async function fetchInvoicePayments() {
+  const { data, error } = await supabase.from('invoice_payments').select('*').order('payment_date', { ascending: false });
+  if (error) console.error('fetchInvoicePayments:', error.message);
+  return { payments: data || [] };
+}
+
+export async function saveInvoicePayment({ invoiceId, amount, paymentDate, reference, narration }, userId) {
+  const { data, error } = await supabase.from('invoice_payments').insert([{
+    invoice_id: invoiceId, amount, payment_date: paymentDate,
+    reference, narration, received_by: userId
+  }]).select();
+  if (error) console.error('saveInvoicePayment:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteInvoicePayment(id) {
+  const { error } = await supabase.from('invoice_payments').delete().eq('id', id);
+  if (error) console.error('deleteInvoicePayment:', error.message);
+  return { error };
+}
+
 // ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };

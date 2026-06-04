@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment } from '../lib/supabase';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
@@ -49,6 +49,9 @@ export default function Manager() {
   const [pendingPayments,setPendingPayments] = useState([]);
   const [trustAlert,setTrustAlert]       = useState({msg:'',type:''});
   const [matters,setMatters]             = useState([]);
+  const [invoicePayments,setInvoicePayments] = useState([]);
+  const [payForm,setPayForm]             = useState({invoiceId:'',amount:'',paymentDate:todayStr,reference:'',narration:''});
+  const [showPayForm,setShowPayForm]     = useState(false);
   const [showInvite,setShowInvite]       = useState(false);
   const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:''});
   const [inviting,setInviting]           = useState(false);
@@ -73,18 +76,20 @@ export default function Manager() {
   },[]);
 
   const load = useCallback(async()=>{
-    const [sumRes,profRes,invRes,branchRes,trustRes,matRes] = await Promise.all([
+    const [sumRes,profRes,invRes,branchRes,trustRes,matRes,payRes] = await Promise.all([
       fetchManagerSummary(selDate),
       fetchAllProfiles(),
       fetchInvoices(null),
       supabase.from('branches').select('*').eq('is_active',true).order('name'),
       supabase.from('trust_transactions').select('*').order('date',{ascending:false}),
       supabase.from('matters').select('*').order('created_at',{ascending:false}),
+      fetchInvoicePayments(),
     ]);
     if(sumRes.summary)   setSummary(sumRes.summary);
     if(sumRes.allTime)   setAllTime(sumRes.allTime);
     if(profRes.profiles) setProfiles(profRes.profiles);
     if(invRes.invoices)  setInvoices(invRes.invoices||[]);
+    setInvoicePayments(payRes.payments||[]);
     setBranches(branchRes.data||[]);
     setMatters(matRes.data||[]);
     const txns=trustRes.data||[];
@@ -281,7 +286,7 @@ export default function Manager() {
             </div>
           </div>
           <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['wip','WIP'],['staff','Staff']].map(([v,l])=>(
+            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['wip','WIP'],['debtors','Debtors'],['reports','Reports'],['statements','Statements'],['staff','Staff']].map(([v,l])=>(
               <button key={v} style={{...C.ntab(tab===v),position:'relative',color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent'}} onClick={()=>setTab(v)}>
                 {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
               </button>
@@ -290,6 +295,7 @@ export default function Manager() {
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
             
             <div style={C.pill}><div style={C.dot}/>{clock}</div>
+            <button style={{...C.btn(),fontSize:11}} onClick={()=>router.push('/calendar')}>📅 Calendar</button>
             <button style={{...C.btn('r')}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           </div>
         </div>
@@ -460,6 +466,154 @@ export default function Manager() {
       {!wipData.length?(<div style={{...C.card,textAlign:'center',padding:'40px',color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>✅</div><div style={{fontSize:14}}>All billable work has been invoiced</div><div style={{fontSize:11,color:'#444',marginTop:6}}>No outstanding WIP</div></div>):wipData.map(p=>(<div key={p.id} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{p.full_name}</div><div style={{fontSize:10,color:'#555'}}>{p.email} · {branches.find(b=>b.id===p.branch_id)?.name||'—'}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Earned</div><div style={{fontSize:16,fontWeight:700,color:'#888'}}>{p.earnedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Billed</div><div style={{fontSize:16,fontWeight:700,color:'#8DC63F'}}>{p.billedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Unbilled</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>{p.unbilledUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Est. Value</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>R{p.estValue.toLocaleString()}</div></div></div></div>
         {p.wipMatters.length>0&&(<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Units Earned','Units Billed','Unbilled','Est. Value (excl. VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{p.wipMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{m.matterId}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.matter?.client||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#888'}}>{m.units}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{m.billedUnits||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#EAB308',fontWeight:700}}>{m.unbilled}</td><td style={{...C.td,fontFamily:'monospace',color:'#EAB308',fontWeight:700}}>R{(m.unbilled*p.attyRate).toLocaleString()}</td></tr>))}</tbody></table>)}
       </div>))}
+    </>);
+  })()}
+</div>)}
+
+        {tab==='debtors'&&(<div style={C.main}>
+  {(()=>{
+    const now=new Date();
+    const age=inv=>Math.floor((now-new Date(inv.created_at||0))/86400000);
+    const paid=invId=>invoicePayments.filter(p=>p.invoice_id===invId).reduce((s,p)=>s+Number(p.amount),0);
+    const outstanding=inv=>Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid(inv.id));
+    const bucket=a=>a<=30?'0-30':a<=60?'31-60':a<=90?'61-90':a<=120?'91-120':'120+';
+    const buckets={'0-30':{label:'Current (0–30 days)',color:'#8DC63F',invs:[]},'31-60':{label:'30–60 days',color:'#4A90D9',invs:[]},'61-90':{label:'60–90 days',color:'#EAB308',invs:[]},'91-120':{label:'90–120 days',color:'#E07B30',invs:[]},'120+':{label:'120+ days',color:'#E05252',invs:[]}};
+    const unpaidInvs=invoices.filter(inv=>outstanding(inv)>0);
+    unpaidInvs.forEach(inv=>{const b=bucket(age(inv));if(buckets[b])buckets[b].invs.push(inv);});
+    const totalOut=unpaidInvs.reduce((s,inv)=>s+outstanding(inv),0);
+    const clientMap={};
+    unpaidInvs.forEach(inv=>{const k=inv.client||'Unknown';if(!clientMap[k])clientMap[k]={client:k,total:0,invs:[]};clientMap[k].total+=outstanding(inv);clientMap[k].invs.push(inv);});
+    const clients=Object.values(clientMap).sort((a,b)=>b.total-a.total);
+    return(<>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Debtors Age Analysis</div><div style={{fontSize:11,color:'#444'}}>Outstanding invoices · {new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+        <button style={C.btn('p')} onClick={()=>{setPayForm({invoiceId:'',amount:'',paymentDate:todayStr,reference:'',narration:''});setShowPayForm(true);}}>+ Record Payment</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:14}}>
+        {Object.entries(buckets).map(([k,b])=>{const tot=b.invs.reduce((s,inv)=>s+outstanding(inv),0);return(<div key={k} style={C.stat(false,tot>0)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{b.label}</div><div style={{fontSize:18,fontWeight:800,color:tot>0?b.color:'#333'}}>{fmtR(tot)}</div><div style={{fontSize:10,color:'#444'}}>{b.invs.length} invoice{b.invs.length!==1?'s':''}</div></div>);})}
+      </div>
+      <div style={{...C.card,marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0'}}>Outstanding by Client</div><div style={{fontSize:13,fontWeight:700,color:'#EAB308'}}>{fmtR(totalOut)} total outstanding</div></div>
+        {!clients.length?<div style={{textAlign:'center',padding:30,color:'#555',fontSize:12}}>✅ All invoices paid</div>:
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Client','Invoices','0–30','31–60','61–90','90–120','120+','Total Outstanding'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {clients.map(c=>{
+            const bkts={'0-30':0,'31-60':0,'61-90':0,'91-120':0,'120+':0};
+            c.invs.forEach(inv=>{const b=bucket(age(inv));bkts[b]+=outstanding(inv);});
+            return(<tr key={c.client}>
+              <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{c.client}</td>
+              <td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{c.invs.length}</td>
+              {Object.entries(bkts).map(([k,v])=><td key={k} style={{...C.td,fontFamily:'monospace',color:v>0?buckets[k].color:'#333',fontWeight:v>0?700:400}}>{v>0?fmtR(v):'—'}</td>)}
+              <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#EAB308'}}>{fmtR(c.total)}</td>
+            </tr>);
+          })}
+        </tbody></table>}
+      </div>
+      <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Invoice Detail</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Matter','Date','Age','Invoice Amt','Paid','Outstanding'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {!unpaidInvs.length&&<tr><td colSpan={8} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No outstanding invoices</td></tr>}
+          {unpaidInvs.sort((a,b)=>age(b)-age(a)).map(inv=>{const a=age(inv),p=paid(inv.id),o=outstanding(inv),amt=(inv.total_units||0)*(inv.rate||150)*1.15;return(<tr key={inv.id}>
+            <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
+            <td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id||'—'}</td>
+            <td style={{...C.td,fontSize:10,color:'#666'}}>{fmtDate(inv.created_at?.substring(0,10))}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:buckets[bucket(a)].color,fontWeight:700}}>{a}d</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{fmtR(amt)}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:p>0?'#8DC63F':'#333'}}>{p>0?fmtR(p):'—'}</td>
+            <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#EAB308'}}>{fmtR(o)}</td>
+          </tr>);})}
+        </tbody></table>
+      </div>
+    </>);
+  })()}
+  {showPayForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowPayForm(false)}>
+    <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:440}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:18}}>Record Payment</div>
+      {(()=>{const lbl={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};const inp={background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};return(<div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div><label style={lbl}>Invoice *</label><select style={inp} value={payForm.invoiceId} onChange={e=>setPayForm(f=>({...f,invoiceId:e.target.value}))}><option value="">— Select invoice —</option>{invoices.filter(inv=>{const p=invoicePayments.filter(x=>x.invoice_id===inv.id).reduce((s,x)=>s+Number(x.amount),0);return Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-p)>0;}).map(inv=><option key={inv.id} value={inv.id}>{inv.id} · {inv.client} · {fmtR((inv.total_units||0)*(inv.rate||150)*1.15)}</option>)}</select></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div><label style={lbl}>Amount *</label><input style={inp} type="number" placeholder="0.00" value={payForm.amount} onChange={e=>setPayForm(f=>({...f,amount:e.target.value}))}/></div>
+          <div><label style={lbl}>Payment Date *</label><input style={inp} type="date" value={payForm.paymentDate} onChange={e=>setPayForm(f=>({...f,paymentDate:e.target.value}))}/></div>
+        </div>
+        <div><label style={lbl}>Reference</label><input style={inp} type="text" placeholder="EFT ref, cheque no..." value={payForm.reference} onChange={e=>setPayForm(f=>({...f,reference:e.target.value}))}/></div>
+        <div><label style={lbl}>Narration</label><input style={inp} type="text" placeholder="Payment description..." value={payForm.narration} onChange={e=>setPayForm(f=>({...f,narration:e.target.value}))}/></div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:6}}>
+          <button style={C.btn()} onClick={()=>setShowPayForm(false)}>Cancel</button>
+          <button style={C.btn('p')} onClick={async()=>{if(!payForm.invoiceId||!payForm.amount){showAlert('Select invoice and amount.','error');return;}const{error}=await saveInvoicePayment({invoiceId:payForm.invoiceId,amount:parseFloat(payForm.amount),paymentDate:payForm.paymentDate,reference:payForm.reference,narration:payForm.narration},profile?.id);if(error){showAlert('Error: '+error.message,'error');return;}showAlert('✓ Payment recorded.');setShowPayForm(false);load();}}>Record Payment</button>
+        </div>
+      </div>);})()}
+    </div>
+  </div>)}
+</div>)}
+
+        {tab==='reports'&&(<div style={C.main}>
+  {(()=>{
+    const now=new Date();
+    const paid=invId=>invoicePayments.filter(p=>p.invoice_id===invId).reduce((s,p)=>s+Number(p.amount),0);
+    const monthMap={};
+    invoices.forEach(inv=>{
+      const month=inv.created_at?.substring(0,7);if(!month)return;
+      if(!monthMap[month])monthMap[month]={month,invoiced:0,collected:0,units:0,count:0};
+      const amt=(inv.total_units||0)*(inv.rate||150)*1.15;
+      monthMap[month].invoiced+=amt;monthMap[month].collected+=paid(inv.id);
+      monthMap[month].units+=inv.total_units||0;monthMap[month].count++;
+    });
+    const months=Object.values(monthMap).sort((a,b)=>b.month.localeCompare(a.month));
+    const totalInvoiced=months.reduce((s,m)=>s+m.invoiced,0);
+    const totalCollected=months.reduce((s,m)=>s+m.collected,0);
+    const totalOutstanding=totalInvoiced-totalCollected;
+    const attyRev=filteredProfiles.map(p=>{const inv=invoices.filter(i=>i.user_id===p.id);const invAmt=inv.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150)*1.15,0);const coll=inv.reduce((s,i)=>s+paid(i.id),0);return{...p,invoiced:invAmt,collected:coll,outstanding:invAmt-coll,units:inv.reduce((s,i)=>s+(i.total_units||0),0)};}).sort((a,b)=>b.invoiced-a.invoiced);
+    return(<>
+      <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Financial Reports — Motsoeneng Bill</div>
+      <div style={{fontSize:11,color:'#444',marginBottom:14}}>Revenue, collections and WIP summary</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Total Invoiced',v:fmtR(totalInvoiced),a:true},{l:'Total Collected',v:fmtR(totalCollected),a:true},{l:'Outstanding',v:fmtR(totalOutstanding),w:totalOutstanding>0},{l:'Collection Rate',v:`${totalInvoiced>0?Math.round(totalCollected/totalInvoiced*100):0}%`,a:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
+      </div>
+      <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Monthly Revenue — All Time</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Month','Invoices','Units','Invoiced (incl. VAT)','Collected','Outstanding','Collection %'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {!months.length&&<tr><td colSpan={7} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No invoice data yet</td></tr>}
+          {months.map(m=>{const pct=m.invoiced>0?Math.round(m.collected/m.invoiced*100):0;return(<tr key={m.month}>
+            <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{fmonth(m.month)}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.count}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{m.units}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{fmtR(m.invoiced)}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#4A90D9'}}>{m.collected>0?fmtR(m.collected):'—'}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:m.invoiced-m.collected>0?'#EAB308':'#555'}}>{m.invoiced-m.collected>0?fmtR(m.invoiced-m.collected):'—'}</td>
+            <td style={{...C.td,fontFamily:'monospace'}}><div style={{display:'flex',alignItems:'center',gap:6}}><div style={{flex:1,height:4,background:'#1A1A1A',borderRadius:2}}><div style={{width:`${pct}%`,height:'100%',background:pct>=80?'#8DC63F':pct>=50?'#EAB308':'#E05252',borderRadius:2}}/></div><span style={{fontSize:10,color:'#888',minWidth:30}}>{pct}%</span></div></td>
+          </tr>);})}
+          {months.length>0&&<tr style={{background:'rgba(141,198,63,0.05)'}}><td style={{...C.th,paddingTop:12}} colSpan={3}>TOTAL</td><td style={{...C.th,fontFamily:'monospace',color:'#8DC63F',paddingTop:12}}>{fmtR(totalInvoiced)}</td><td style={{...C.th,fontFamily:'monospace',color:'#4A90D9',paddingTop:12}}>{fmtR(totalCollected)}</td><td style={{...C.th,fontFamily:'monospace',color:'#EAB308',paddingTop:12}}>{fmtR(totalOutstanding)}</td><td style={{...C.th,paddingTop:12}}>{totalInvoiced>0?Math.round(totalCollected/totalInvoiced*100):0}%</td></tr>}
+        </tbody></table>
+      </div>
+      <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Revenue Summary</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Attorney','Branch','Units Billed','Total Invoiced','Collected','Outstanding'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {attyRev.map(a=><tr key={a.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}</td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9}}>{branches.find(b=>b.id===a.branch_id)?.name||'—'}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.invoiced>0?fmtR(a.invoiced):'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#4A90D9'}}>{a.collected>0?fmtR(a.collected):'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.outstanding>0?'#EAB308':'#555'}}>{a.outstanding>0?fmtR(a.outstanding):'—'}</td></tr>)}
+        </tbody></table>
+      </div>
+    </>);
+  })()}
+</div>)}
+
+        {tab==='statements'&&(<div style={C.main}>
+  {(()=>{
+    const paid=invId=>invoicePayments.filter(p=>p.invoice_id===invId).reduce((s,p)=>s+Number(p.amount),0);
+    const clientMap={};
+    invoices.forEach(inv=>{
+      const k=inv.client||'Unknown';
+      if(!clientMap[k])clientMap[k]={client:k,invoices:[],billed:0,paid:0};
+      const amt=(inv.total_units||0)*(inv.rate||150)*1.15;
+      clientMap[k].invoices.push(inv);clientMap[k].billed+=amt;clientMap[k].paid+=paid(inv.id);
+    });
+    const clients=Object.values(clientMap).sort((a,b)=>b.billed-a.billed);
+    function printStatement(c){
+      const rows=c.invoices.map(inv=>{const p=paid(inv.id),amt=(inv.total_units||0)*(inv.rate||150),vat=amt*.15,total=amt*1.15,out=Math.max(0,total-p);return`<tr><td>${fmtDate(inv.created_at?.substring(0,10))}</td><td style="font-family:monospace">${inv.id}</td><td>${inv.matter_name||inv.matter_id||'—'}</td><td align="right">${inv.total_units||0}</td><td align="right">R${amt.toLocaleString()}</td><td align="right">R${vat.toFixed(2)}</td><td align="right">R${total.toFixed(2)}</td><td align="right" style="color:${p>0?'#16a34a':'#666'}">${p>0?'R'+p.toFixed(2):'—'}</td><td align="right" style="font-weight:700;color:${out>0?'#dc2626':'#16a34a'}">${out>0?'R'+out.toFixed(2):'PAID'}</td></tr>`;}).join('');
+      const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Statement — ${c.client}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:40px;max-width:900px;margin:auto}.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #8DC63F;padding-bottom:16px;margin-bottom:20px}.logo{font-size:26px;font-weight:900;letter-spacing:-0.04em}.logo span{color:#8DC63F}table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#f8f8f8;padding:8px;font-size:9px;text-transform:uppercase;color:#999;border-bottom:2px solid #eee;text-align:left}td{padding:7px 8px;font-size:11px;border-bottom:1px solid #f3f3f3}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;background:#f9f9f9;border-radius:8px;padding:16px;margin-bottom:16px}.lbl{font-size:9px;text-transform:uppercase;color:#aaa;margin-bottom:3px}.val{font-size:16px;font-weight:700}.foot{margin-top:20px;padding-top:12px;border-top:1px solid #eee;font-size:10px;color:#ccc;text-align:center}@media print{body{padding:20px}}</style></head><body><div class="top"><div><div class="logo">M<span>B</span></div><div style="font-size:11px;color:#999;margin-top:2px">Motsoeneng Bill Attorneys</div></div><div style="text-align:right"><h2>ACCOUNT STATEMENT</h2><div style="font-size:11px;color:#999">Client: ${c.client} · ${new Date().toLocaleDateString('en-ZA')}</div></div></div><div class="summary"><div><div class="lbl">Total Invoiced</div><div class="val">R${c.billed.toFixed(2)}</div></div><div><div class="lbl">Total Paid</div><div class="val" style="color:#16a34a">R${c.paid.toFixed(2)}</div></div><div><div class="lbl">Balance Due</div><div class="val" style="color:${c.billed-c.paid>0?'#dc2626':'#16a34a'}">${c.billed-c.paid>0?'R'+(c.billed-c.paid).toFixed(2):'PAID IN FULL'}</div></div></div><table><thead><tr><th>Date</th><th>Invoice</th><th>Matter</th><th align="right">Units</th><th align="right">Excl. VAT</th><th align="right">VAT 15%</th><th align="right">Total</th><th align="right">Paid</th><th align="right">Balance</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:#ccc;padding:16px">No invoices</td></tr>'}</tbody></table><div class="foot">Motsoeneng Bill Attorneys · VAT Reg: 4100000000 · accounts@mb.co.za<br><em>This statement was generated on ${new Date().toLocaleDateString('en-ZA')} and is subject to errors and omissions.</em></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
+      const w=window.open('','_blank','width=980,height=760');w.document.write(html);w.document.close();
+    }
+    return(<>
+      <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Billing Statements</div>
+      <div style={{fontSize:11,color:'#444',marginBottom:14}}>Per-client account statements · Print or email to clients</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Total clients',v:clients.length},{l:'Total invoiced',v:fmtR(clients.reduce((s,c)=>s+c.billed,0)),a:true},{l:'Total outstanding',v:fmtR(clients.reduce((s,c)=>s+Math.max(0,c.billed-c.paid),0)),w:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
+      </div>
+      {!clients.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📋</div><div>No invoices yet</div></div>):clients.map(c=>{const out=Math.max(0,c.billed-c.paid);return(<div key={c.client} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{c.client}</div><div style={{fontSize:10,color:'#555'}}>{c.invoices.length} invoice{c.invoices.length!==1?'s':''}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Invoiced</div><div style={{fontSize:15,fontWeight:700,color:'#8DC63F'}}>{fmtR(c.billed)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Paid</div><div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(c.paid)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Balance</div><div style={{fontSize:15,fontWeight:700,color:out>0?'#EAB308':'#8DC63F'}}>{out>0?fmtR(out):'Paid ✓'}</div></div><button style={C.btn('p')} onClick={()=>printStatement(c)}>Print Statement</button></div></div></div>);})}
     </>);
   })()}
 </div>)}
