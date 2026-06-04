@@ -170,9 +170,11 @@ const rFormDirty=useRef(false);
       const p=await getProfile(u.id); setProfile(p);
       if(p?.rate) setInvRate(Number(p.rate)||150);
       if(p?.full_name) setInvAtty(p.full_name);
-      if(p?.role==='manager'||p?.role==='national_manager'||u.email==='livhuwaningwn@gmail.com'){ router.replace('/manager'); return; }
-      if(p?.role==='branch_manager'){ router.replace('/manager'); return; }
-      if(p?.role==='bookkeeper'){ router.replace('/bookkeeper'); return; }
+      if(p?.role==='manager'||p?.role==='national_manager'||u.email==='livhuwaningwn@gmail.com'){ router.replace(p?.password_changed===false?'/change-password':'/manager'); return; }
+      if(p?.role==='branch_manager'){ router.replace(p?.password_changed===false?'/change-password':'/manager'); return; }
+      if(p?.role==='bookkeeper'){ router.replace(p?.password_changed===false?'/change-password':'/bookkeeper'); return; }
+      if(p?.role==='receptionist'){ router.replace(p?.password_changed===false?'/change-password':'/receptionist'); return; }
+      if(p?.password_changed===false){ router.replace('/change-password'); return; }
       setAuthLoading(false);
     });
   },[]);

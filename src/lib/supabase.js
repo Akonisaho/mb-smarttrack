@@ -226,7 +226,7 @@ export async function fetchManagerSummary(date, period='all') {
 export async function fetchAllProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, branch_id')
+    .select('id, full_name, email, role, branch_id, rate, monthly_target, password_changed')
     .order('full_name');
   if (error) console.error('fetchAllProfiles:', error.message);
   return { profiles: data || [] };
