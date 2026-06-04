@@ -7,6 +7,7 @@ import {
   fetchMatters, createMatter, deleteMatter,
   fetchInvoices, saveInvoice, deleteInvoice,
   fetchHistory, fetchMonthActivities,
+  fetchDisbursements, saveDisbursement, deleteDisbursement,
   searchAll
 } from '../lib/supabase';
 import Head from 'next/head';
@@ -114,6 +115,9 @@ const [allMatters,setAllMatters]=useState([]);
   const [histYears,setHistYears]=useState([]);
   const [selMonth,setSelMonth]=useState(null);
   const [monthData,setMonthData]=useState(null);
+  const [disbursements,setDisbursements]=useState([]);
+  const [disbForm,setDisbForm]=useState({matter_id:'',date:today,category:'copies',description:'',amount:'',quantity:1,vat_applicable:false,reference:''});
+  const [showDisbForm,setShowDisbForm]=useState(false);
   const [showCall,setShowCall]=useState(false);
   const [callForm,setCallForm]=useState({description:'',matterId:'',durationMins:6,date:today});
   const [callSaving,setCallSaving]=useState(false);
@@ -188,6 +192,8 @@ const rFormDirty=useRef(false);
       setMatters(matRes.matters||[]);
       const dmap={}; (allRes.activities||[]).forEach(a=>{ if(!dmap[a.date]) dmap[a.date]={date:a.date,sessions:0}; dmap[a.date].sessions++; });
       setDates(Object.values(dmap).sort((a,b)=>b.date.localeCompare(a.date)));
+      const disbRes=await fetchDisbursements({userId,all:false});
+      setDisbursements(disbRes.disbursements||[]);
     };
     doLoad();
     const t=setInterval(doLoad,120000);
@@ -696,13 +702,14 @@ const rFormDirty=useRef(false);
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           {profile?.role==='manager'&&<button style={{background:'transparent',border:'1px solid rgba(108,192,74,0.3)',color:'#6CC04A',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/manager')}>Manager View</button>}
           <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/calendar')}>📅 Calendar</button>
+          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/documents')}>📂 Docs</button>
           <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>setShowPwdForm(true)}>🔒 Password</button>
 <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           <div style={C.mark}>M<span style={{color:'#6CC04A'}}>B</span></div>
           <div><div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack</div><div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill</div></div>
         </div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-          {(profile?.role==='bookkeeper'?[['trust','🏦 Trust'],['invoices','Invoice'],['archive','Archive']]:[['today','Today'],['history','History'],['matters','Matters'],['analytics','Analytics'],['activities','All Activities'],['invoices','Invoice'],['archive','Archive'],['trust','🏦 Trust']]).map(([v,l])=>(
+          {(profile?.role==='bookkeeper'?[['trust','🏦 Trust'],['invoices','Invoice'],['archive','Archive']]:[['today','Today'],['history','History'],['matters','Matters'],['disbursements','Costs'],['analytics','Analytics'],['activities','All Activities'],['invoices','Invoice'],['archive','Archive'],['trust','🏦 Trust']]).map(([v,l])=>(
             <button key={v} style={{...C.ntab(tab===v),color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent',position:'relative'}} onClick={()=>setTab(v)}>
               {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
             </button>
@@ -726,6 +733,62 @@ const rFormDirty=useRef(false);
       {tab==='history'&&(<div style={C.main}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}><div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Work History</div><div style={{fontSize:11,color:'#444'}}>Full record of all tracked time</div></div><select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);setMonthData(null);}}>{histYears.length?histYears.map(y=><option key={y} value={y}>{y}</option>):<option value={histYear}>{histYear}</option>}</select></div><div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>{Array.from({length:12},(_,i)=>{ const monthStr=`${histYear}-${String(i+1).padStart(2,'0')}`,monthName=new Date(histYear,i,1).toLocaleString('en-ZA',{month:'long'}),data=histMonths.find(m=>m.month===monthStr),isSelected=selMonth===monthStr,hasFuture=new Date(histYear,i,1)>new Date(); return(<div key={monthStr} style={{background:isSelected?'rgba(108,192,74,0.08)':data?'#111':'#0D0D0D',border:`1px solid ${isSelected?'rgba(108,192,74,0.4)':data?'#1A1A1A':'#131313'}`,borderRadius:8,padding:14,cursor:data?'pointer':'default',opacity:hasFuture?0.4:1}} onClick={()=>data&&loadMonth(monthStr)}><div style={{fontSize:12,fontWeight:600,color:data?'#D0D0D0':'#333',marginBottom:6}}>{monthName}</div>{data?(<><div style={{fontSize:18,fontWeight:800,color:isSelected?'#6CC04A':'#6CC04A',marginBottom:2}}>{data.billable_units||0} units</div><div style={{fontSize:11,color:'#4A90D9',fontWeight:600,marginTop:2}}>R{((data.billable_units||0)*invRate*1.15).toFixed(2)}</div><div style={{fontSize:10,color:'#555',marginTop:2}}>incl. VAT</div></>):(<div style={{fontSize:11,color:'#2A2A2A',marginTop:8}}>{hasFuture?'Future':'No data'}</div>)}</div>); })}</div>{selMonth&&monthData&&(<div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}><div><span style={{fontSize:14,fontWeight:700}}>{new Date(selMonth+'-01T12:00:00').toLocaleString('en-ZA',{month:'long',year:'numeric'})}</span><span style={{fontSize:11,color:'#555',marginLeft:12}}>{monthData.totals?.billable_units||0} units · {toHm(monthData.totals?.billable_seconds)} billable</span></div><div style={{display:'flex',gap:8}}><button style={C.btn()} onClick={()=>{setSelMonth(null);setMonthData(null);}}>✕ Close</button><button style={C.btn('p')} onClick={()=>{setInvMatterId('');setTab('invoices');}}>Invoice for this month</button></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>{[{l:'Billing Units',v:monthData.totals?.billable_units||0,s:'billable units',a:true},{l:'Billable Time',v:toHm(monthData.totals?.billable_seconds),s:'time billed',a:false},{l:'Est. Revenue',v:`R${((monthData.totals?.billable_units||0)*invRate*1.15).toFixed(2)}`,s:'incl. VAT',a:true}].map(({l,v,s,a})=>(<div key={l} style={C.stat(a)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#6CC04A':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}</div></div>)}</div>)}
 
       {tab==='matters'&&(<div style={C.main}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}><div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Client Matters</div><div style={{fontSize:11,color:'#444'}}>Activities auto-linked by title matching</div></div><button style={C.btn('p')} onClick={()=>setShowMatterForm(true)}>+ New Matter</button></div>{matterMsg&&<div style={{background:'rgba(108,192,74,0.08)',border:'1px solid rgba(108,192,74,0.25)',borderRadius:6,padding:'10px 14px',marginBottom:14,fontSize:12,color:'#6CC04A'}}>{matterMsg}</div>}{!matters.length?(<div style={{...C.card,textAlign:'center',padding:'40px'}}><div style={{fontSize:32,marginBottom:12}}>📁</div><div style={{fontSize:14,color:'#444',marginBottom:8}}>No matters yet</div><button style={C.btn('p')} onClick={()=>setShowMatterForm(true)}>+ Create first matter</button></div>):(<div style={{display:'grid',gap:10}}>{matters.map(m=>{ const mActs=allActs.filter(a=>a.matter===m.id),mBill=mActs.filter(a=>a.classification==='billable'),mU=mBill.reduce((s,a)=>s+calcUnits(a.duration_seconds),0),mSec=mActs.reduce((s,a)=>s+Number(a.duration_seconds||0),0),trustBal=getMatterBalance(m.id),alert=balanceAlerts.find(a=>a.matter_id===m.id&&a.is_active),isLow=alert&&trustBal<Number(alert.minimum_balance); return(<div key={m.id} style={{...C.card,border:isLow?'1px solid rgba(220,80,80,0.3)':'1px solid #1A1A1A'}}><div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div style={{flex:1}}><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:11,color:'#A78BFA',fontFamily:'monospace',fontWeight:600}}>{m.id}</span>{isLow&&<span style={{fontSize:9,color:'#E05252',border:'1px solid rgba(220,80,80,0.4)',padding:'1px 8px',borderRadius:20}}>⚠ Low trust balance</span>}</div><div style={{fontSize:14,fontWeight:700,color:'#E0E0E0',marginBottom:2}}>{m.name}</div><div style={{fontSize:12,color:'#888'}}>Client: <strong style={{color:'#C0C0C0'}}>{m.client}</strong></div></div><div style={{display:'flex',gap:16,alignItems:'center',flexShrink:0,flexWrap:'wrap'}}>{[['Activities',mActs.length,'#888'],['Time',toHm(mSec),'#888'],['Units',mU,mU>0?'#6CC04A':'#444'],['Value',`R${(mU*invRate).toLocaleString()}`,mU>0?'#6CC04A':'#444'],['Trust',fmtR(trustBal),isLow?'#E05252':trustBal>0?'#4A90D9':'#444']].map(([l,v,c])=>(<div key={l} style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:2}}>{l}</div><div style={{fontSize:16,fontWeight:700,color:c}}>{v}</div></div>))}<div style={{display:'flex',flexDirection:'column',gap:6}}><button style={{...C.btn('p'),fontSize:11,padding:'5px 12px'}} onClick={()=>{setInvMatterId(m.id);setTab('invoices');}}>Invoice</button><button style={{...C.btn('trust'),fontSize:11,padding:'5px 12px'}} onClick={()=>{setTab('trust');setTrustTab('ledger');}}>Trust</button><button style={{...C.btn('r'),fontSize:11,padding:'5px 12px'}} onClick={()=>handleDeleteMatter(m.id)}>Delete</button></div></div></div></div>); })}</div>)}</div>)}
+
+      {tab==='disbursements'&&(<div style={C.main}>
+  {(()=>{
+    const cats={copies:'📋',filing_fee:'📁',sheriff:'⚖️',travel:'🚗',counsel:'👔',search:'🔍',postage:'📮',other:'📎'};
+    const unbilled=disbursements.filter(d=>d.status==='unbilled');
+    const totalUnbilled=unbilled.reduce((s,d)=>s+Number(d.amount),0);
+    return(<>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Costs &amp; Disbursements</div><div style={{fontSize:11,color:'#444'}}>Costs advanced on behalf of clients</div></div>
+        <button style={{background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:700}} onClick={()=>{setDisbForm({matter_id:'',date:today,category:'copies',description:'',amount:'',quantity:1,vat_applicable:false,reference:''});setShowDisbForm(true);}}>+ Add Cost</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Unbilled items',v:unbilled.length,s:'awaiting invoicing'},{l:'Unbilled amount',v:'R '+totalUnbilled.toFixed(2),s:'excl. VAT',w:totalUnbilled>0},{l:'Total costs',v:disbursements.length,s:'all time'}].map(({l,v,s,w})=>(<div key={l} style={{background:w?'rgba(234,179,8,0.05)':'#111',border:`1px solid ${w?'rgba(234,179,8,0.25)':'#1A1A1A'}`,borderRadius:8,padding:14}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&totalUnbilled>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+      </div>
+      <div style={{background:'#111',border:'1px solid #1A1A1A',borderRadius:8,padding:16}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr>{['','Date','Matter','Description','Qty','Amount','Status','Del'].map(h=><th key={h} style={{fontSize:9,textTransform:'uppercase',letterSpacing:'0.08em',color:'#444',padding:'9px 10px',borderBottom:'1px solid #181818',textAlign:'left',fontWeight:600}}>{h}</th>)}</tr></thead>
+          <tbody>
+            {!disbursements.length&&<tr><td colSpan={8} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:12}}>No costs yet. Click + Add Cost to record your first disbursement.</td></tr>}
+            {disbursements.map(d=>{const m=matters.find(x=>x.id===d.matter_id);return(<tr key={d.id}>
+              <td style={{padding:'9px 10px',fontSize:16,borderBottom:'1px solid #161616'}}>{cats[d.category]||'📎'}</td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616',color:'#666'}}>{d.date}</td>
+              <td style={{padding:'9px 10px',fontSize:10,borderBottom:'1px solid #161616',fontFamily:'monospace',color:'#A78BFA'}}>{d.matter_id||'—'}{m&&<div style={{fontSize:9,color:'#555'}}>{m.client}</div>}</td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616',color:'#C8C8C8'}}>{d.description}</td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616',fontFamily:'monospace',textAlign:'center',color:'#777'}}>{d.quantity||1}</td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616',fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>R{Number(d.amount).toFixed(2)}</td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616'}}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:d.status==='billed'?'rgba(141,198,63,0.1)':'rgba(234,179,8,0.1)',color:d.status==='billed'?'#8DC63F':'#EAB308',fontWeight:600}}>{d.status||'unbilled'}</span></td>
+              <td style={{padding:'9px 10px',fontSize:11,borderBottom:'1px solid #161616'}}>{d.status!=='billed'&&<button style={{background:'rgba(220,80,80,0.1)',border:'1px solid rgba(220,80,80,0.3)',color:'#E05252',padding:'3px 8px',borderRadius:5,cursor:'pointer',fontSize:10,fontFamily:'inherit'}} onClick={async()=>{if(!confirm('Delete?'))return;await deleteDisbursement(d.id);const r=await fetchDisbursements({userId,all:false});setDisbursements(r.disbursements||[]);}}>✕</button>}</td>
+            </tr>);})}
+          </tbody>
+        </table>
+      </div>
+      {showDisbForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowDisbForm(false)}>
+        <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:18}}>Add Cost / Disbursement</div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Matter *</label><select style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} value={disbForm.matter_id} onChange={e=>setDisbForm(f=>({...f,matter_id:e.target.value}))}><option value="">— Select matter —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.client}</option>)}</select></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Date *</label><input style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} type="date" value={disbForm.date} onChange={e=>setDisbForm(f=>({...f,date:e.target.value}))}/></div>
+              <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Category</label><select style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} value={disbForm.category} onChange={e=>setDisbForm(f=>({...f,category:e.target.value}))}>{Object.keys(cats).map(k=><option key={k} value={k}>{k.replace('_',' ')}</option>)}</select></div>
+            </div>
+            <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Description *</label><input style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} type="text" placeholder="e.g. High Court filing fee" value={disbForm.description} onChange={e=>setDisbForm(f=>({...f,description:e.target.value}))}/></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Amount (R) *</label><input style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} type="number" placeholder="0.00" value={disbForm.amount} onChange={e=>setDisbForm(f=>({...f,amount:e.target.value}))}/></div>
+              <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Quantity</label><input style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} type="number" min="1" value={disbForm.quantity} onChange={e=>setDisbForm(f=>({...f,quantity:parseInt(e.target.value)||1}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:6}}>
+              <button style={{background:'transparent',border:'1px solid #252525',color:'#888',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit'}} onClick={()=>setShowDisbForm(false)}>Cancel</button>
+              <button style={{background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:700}} onClick={async()=>{if(!disbForm.matter_id||!disbForm.description||!disbForm.amount){return;}const{error}=await saveDisbursement({matter_id:disbForm.matter_id,date:disbForm.date,category:disbForm.category,description:disbForm.description,amount:parseFloat(disbForm.amount)*disbForm.quantity,quantity:disbForm.quantity,reference:disbForm.reference,branch_id:profile?.branch_id||null,status:'unbilled'},userId);if(error)return;setShowDisbForm(false);const r=await fetchDisbursements({userId,all:false});setDisbursements(r.disbursements||[]);}}>Add Cost</button>
+            </div>
+          </div>
+        </div>
+      </div>)}
+    </>);
+  })()}
+</div>)}
 
       {tab==='analytics'&&(<div style={C.main}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice } from '../lib/supabase';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
@@ -52,6 +52,16 @@ export default function Manager() {
   const [invoicePayments,setInvoicePayments] = useState([]);
   const [payForm,setPayForm]             = useState({invoiceId:'',amount:'',paymentDate:todayStr,reference:'',narration:''});
   const [showPayForm,setShowPayForm]     = useState(false);
+  const [clients,setClients]             = useState([]);
+  const [ficaRecords,setFicaRecords]     = useState([]);
+  const [disbursements,setDisbursements] = useState([]);
+  const [feeSchedules,setFeeSchedules]   = useState([]);
+  const [disbForm,setDisbForm]           = useState({matter_id:'',date:todayStr,category:'copies',description:'',amount:'',quantity:1,vat_applicable:false,reference:''});
+  const [showDisbForm,setShowDisbForm]   = useState(false);
+  const [bulkSelAtty,setBulkSelAtty]     = useState([]);
+  const [bulkProgress,setBulkProgress]   = useState('');
+  const [schedForm,setSchedForm]         = useState({name:'',unit_rate:150,description:'',is_default:false});
+  const [showSchedForm,setShowSchedForm] = useState(false);
   const [showInvite,setShowInvite]       = useState(false);
   const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:''});
   const [inviting,setInviting]           = useState(false);
@@ -76,7 +86,7 @@ export default function Manager() {
   },[]);
 
   const load = useCallback(async()=>{
-    const [sumRes,profRes,invRes,branchRes,trustRes,matRes,payRes] = await Promise.all([
+    const [sumRes,profRes,invRes,branchRes,trustRes,matRes,payRes,cliRes,ficaRes,disbRes,schedRes] = await Promise.all([
       fetchManagerSummary(selDate),
       fetchAllProfiles(),
       fetchInvoices(null),
@@ -84,12 +94,20 @@ export default function Manager() {
       supabase.from('trust_transactions').select('*').order('date',{ascending:false}),
       supabase.from('matters').select('*').order('created_at',{ascending:false}),
       fetchInvoicePayments(),
+      fetchClients({}),
+      fetchAllFicaRecords(),
+      fetchDisbursements({ all:true }),
+      fetchFeeSchedules(),
     ]);
     if(sumRes.summary)   setSummary(sumRes.summary);
     if(sumRes.allTime)   setAllTime(sumRes.allTime);
     if(profRes.profiles) setProfiles(profRes.profiles);
     if(invRes.invoices)  setInvoices(invRes.invoices||[]);
     setInvoicePayments(payRes.payments||[]);
+    setClients(cliRes.clients||[]);
+    setFicaRecords(ficaRes.records||[]);
+    setDisbursements(disbRes.disbursements||[]);
+    setFeeSchedules(schedRes.schedules||[]);
     setBranches(branchRes.data||[]);
     setMatters(matRes.data||[]);
     const txns=trustRes.data||[];
@@ -286,7 +304,7 @@ export default function Manager() {
             </div>
           </div>
           <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['wip','WIP'],['debtors','Debtors'],['reports','Reports'],['statements','Statements'],['staff','Staff']].map(([v,l])=>(
+            {[['overview','Overview'],['trust','🏦 Trust'],['analytics','Analytics'],['history','History'],['invoices','Invoices'],['wip','WIP'],['debtors','Debtors'],['reports','Reports'],['statements','Statements'],['clients','Clients'],['disbursements','Disbursements'],['schedules','Fee Schedules'],['staff','Staff']].map(([v,l])=>(
               <button key={v} style={{...C.ntab(tab===v),position:'relative',color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent'}} onClick={()=>setTab(v)}>
                 {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
               </button>
@@ -296,6 +314,8 @@ export default function Manager() {
             
             <div style={C.pill}><div style={C.dot}/>{clock}</div>
             <button style={{...C.btn(),fontSize:11}} onClick={()=>router.push('/calendar')}>📅 Calendar</button>
+            <button style={{...C.btn(),fontSize:11}} onClick={()=>router.push('/clients')}>👥 Clients</button>
+            <button style={{...C.btn(),fontSize:11}} onClick={()=>router.push('/documents')}>📂 Docs</button>
             <button style={{...C.btn('r')}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
           </div>
         </div>
@@ -308,6 +328,7 @@ export default function Manager() {
   <button style={{background:'none',border:'none',color:'inherit',cursor:'pointer',flexShrink:0}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button>
 </div>)}
         {pendingPayments.length>0&&tab!=='trust'&&(<div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>⏳ {pendingPayments.length} trust payment{pendingPayments.length>1?'s':''} pending your approval — {fmtR(pendingPayments.reduce((s,t)=>s+Number(t.amount),0))}</span><button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review approvals →</button></div>)}
+        {(()=>{ const ficaMap=Object.fromEntries(ficaRecords.map(r=>[r.client_id,r])); const pending=clients.filter(c=>{ const r=ficaMap[c.id]; return !r||r.fica_status==='pending'||r.fica_status==='expired'; }).length; return pending>0&&tab!=='clients'?(<div style={{background:'rgba(220,80,80,0.08)',border:'1px solid rgba(220,80,80,0.25)',padding:'10px 24px',fontSize:12,color:'#E05252',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>🪪 {pending} client{pending!==1?'s':''} with FICA pending or expired</span><button style={{...C.btn('r'),fontSize:11}} onClick={()=>setTab('clients')}>Review →</button></div>):null; })()}
 
         {tab==='overview'&&(<div style={C.main}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
@@ -616,6 +637,121 @@ export default function Manager() {
       {!clients.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📋</div><div>No invoices yet</div></div>):clients.map(c=>{const out=Math.max(0,c.billed-c.paid);return(<div key={c.client} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{c.client}</div><div style={{fontSize:10,color:'#555'}}>{c.invoices.length} invoice{c.invoices.length!==1?'s':''}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Invoiced</div><div style={{fontSize:15,fontWeight:700,color:'#8DC63F'}}>{fmtR(c.billed)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Paid</div><div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(c.paid)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Balance</div><div style={{fontSize:15,fontWeight:700,color:out>0?'#EAB308':'#8DC63F'}}>{out>0?fmtR(out):'Paid ✓'}</div></div><button style={C.btn('p')} onClick={()=>printStatement(c)}>Print Statement</button></div></div></div>);})}
     </>);
   })()}
+</div>)}
+
+        {tab==='clients'&&(<div style={C.main}>
+  {(()=>{
+    const ficaMap=Object.fromEntries(ficaRecords.map(r=>[r.client_id,r]));
+    const ficaStatus=id=>{const r=ficaMap[id];if(!r)return'pending';return r.fica_status||'pending';};
+    const FSTA={compliant:{label:'Compliant',color:'#8DC63F',bg:'rgba(141,198,63,0.1)'},partial:{label:'Partial',color:'#EAB308',bg:'rgba(234,179,8,0.1)'},pending:{label:'Pending',color:'#E07B30',bg:'rgba(224,123,48,0.1)'},expired:{label:'Expired',color:'#E05252',bg:'rgba(220,80,80,0.1)'}};
+    return(<>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Clients</div><div style={{fontSize:11,color:'#444'}}>{clients.length} clients · Firm-wide</div></div>
+        <div style={{display:'flex',gap:8}}><button style={C.btn()} onClick={()=>router.push('/clients')}>Open Full CRM →</button></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Total Clients',v:clients.length},{l:'FICA Compliant',v:clients.filter(c=>ficaStatus(c.id)==='compliant').length,a:true},{l:'FICA Pending',v:clients.filter(c=>ficaStatus(c.id)==='pending').length,w:true},{l:'FICA Expired',v:clients.filter(c=>ficaStatus(c.id)==='expired').length,w:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
+      </div>
+      <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Ref','Client','Type','Email','FICA','Matters'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+        {!clients.length&&<tr><td colSpan={6} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No clients yet. <button style={{...C.btn('p'),fontSize:11,marginLeft:8}} onClick={()=>router.push('/clients')}>Add first client →</button></td></tr>}
+        {clients.slice(0,50).map(c=>{const fs=ficaStatus(c.id);const fst=FSTA[fs]||FSTA.pending;const cm=matters.filter(m=>m.client_id===c.id);return(<tr key={c.id} style={{cursor:'pointer'}} onClick={()=>router.push('/clients')}>
+          <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{c.client_no||'—'}</td>
+          <td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{c.full_name}</td>
+          <td style={{...C.td,fontSize:10,textTransform:'capitalize',color:'#777'}}>{c.client_type||'individual'}</td>
+          <td style={{...C.td,fontSize:10,color:'#555'}}>{c.email||'—'}</td>
+          <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:fst.bg,color:fst.color,border:`1px solid ${fst.color}44`,fontWeight:600}}>{fst.label}</span></td>
+          <td style={{...C.td,fontFamily:'monospace',textAlign:'center',color:'#777'}}>{cm.length}</td>
+        </tr>);})}
+      </tbody></table></div>
+    </>);
+  })()}
+</div>)}
+
+        {tab==='disbursements'&&(<div style={C.main}>
+  {(()=>{
+    const cats={copies:'📋',filing_fee:'📁',sheriff:'⚖️',travel:'🚗',counsel:'👔',search:'🔍',postage:'📮',other:'📎'};
+    const unbilled=disbursements.filter(d=>d.status==='unbilled');
+    const totalUnbilled=unbilled.reduce((s,d)=>s+Number(d.amount),0);
+    const byMatter={};unbilled.forEach(d=>{if(!byMatter[d.matter_id])byMatter[d.matter_id]={matterId:d.matter_id,items:[],total:0};byMatter[d.matter_id].items.push(d);byMatter[d.matter_id].total+=Number(d.amount);});
+    return(<>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Disbursements</div><div style={{fontSize:11,color:'#444'}}>Costs advanced — all attorneys</div></div>
+        <button style={C.btn('p')} onClick={()=>{setDisbForm({matter_id:'',date:todayStr,category:'copies',description:'',amount:'',quantity:1,vat_applicable:false,reference:''});setShowDisbForm(true);}}>+ Add Disbursement</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+        {[{l:'Unbilled disbursements',v:unbilled.length,s:'items'},{l:'Total unbilled',v:fmtR(totalUnbilled),s:'excl. VAT',w:totalUnbilled>0},{l:'Matters affected',v:Object.keys(byMatter).length,s:'with unbilled costs'}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&totalUnbilled>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+      </div>
+      <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All Disbursements</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Cat','Date','Matter','Description','Qty','Amount','Status','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {!disbursements.length&&<tr><td colSpan={8} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No disbursements yet</td></tr>}
+          {disbursements.map(d=>(<tr key={d.id}>
+            <td style={{...C.td,width:28,textAlign:'center'}}>{cats[d.category]||'📎'}</td>
+            <td style={{...C.td,fontSize:10,color:'#666'}}>{d.date}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{d.matter_id||'—'}</td>
+            <td style={{...C.td,color:'#C8C8C8'}}>{d.description}</td>
+            <td style={{...C.td,fontFamily:'monospace',textAlign:'center',color:'#777'}}>{d.quantity||1}</td>
+            <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{fmtR(d.amount)}</td>
+            <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:d.status==='billed'?'rgba(141,198,63,0.1)':d.status==='written_off'?'rgba(85,85,85,0.2)':'rgba(234,179,8,0.1)',color:d.status==='billed'?'#8DC63F':d.status==='written_off'?'#555':'#EAB308',fontWeight:600}}>{d.status||'unbilled'}</span></td>
+            <td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{if(!confirm('Delete?'))return;await deleteDisbursement(d.id);load();}}>Del</button></td>
+          </tr>))}
+        </tbody></table>
+      </div>
+      {showDisbForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowDisbForm(false)}>
+        <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:18}}>Add Disbursement</div>
+          {(()=>{const lbl2={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};const inp2={background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};return(<div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div><label style={lbl2}>Matter *</label><select style={inp2} value={disbForm.matter_id} onChange={e=>setDisbForm(f=>({...f,matter_id:e.target.value}))}><option value="">— Select matter —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.client}</option>)}</select></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><label style={lbl2}>Date *</label><input style={inp2} type="date" value={disbForm.date} onChange={e=>setDisbForm(f=>({...f,date:e.target.value}))}/></div>
+              <div><label style={lbl2}>Category *</label><select style={inp2} value={disbForm.category} onChange={e=>setDisbForm(f=>({...f,category:e.target.value}))}>{Object.keys(cats).map(k=><option key={k} value={k} style={{textTransform:'capitalize'}}>{k.replace('_',' ')}</option>)}</select></div>
+            </div>
+            <div><label style={lbl2}>Description *</label><input style={inp2} type="text" placeholder="e.g. Copies of affidavit" value={disbForm.description} onChange={e=>setDisbForm(f=>({...f,description:e.target.value}))}/></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><label style={lbl2}>Amount (R) *</label><input style={inp2} type="number" placeholder="0.00" value={disbForm.amount} onChange={e=>setDisbForm(f=>({...f,amount:e.target.value}))}/></div>
+              <div><label style={lbl2}>Quantity</label><input style={inp2} type="number" min="1" value={disbForm.quantity} onChange={e=>setDisbForm(f=>({...f,quantity:parseInt(e.target.value)||1}))}/></div>
+            </div>
+            <div><label style={lbl2}>Reference</label><input style={inp2} type="text" value={disbForm.reference} onChange={e=>setDisbForm(f=>({...f,reference:e.target.value}))}/></div>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:6}}>
+              <button style={C.btn()} onClick={()=>setShowDisbForm(false)}>Cancel</button>
+              <button style={C.btn('p')} onClick={async()=>{if(!disbForm.matter_id||!disbForm.description||!disbForm.amount){showAlert('Fill in all required fields.','error');return;}const{error}=await saveDisbursement({matter_id:disbForm.matter_id,date:disbForm.date,category:disbForm.category,description:disbForm.description,amount:parseFloat(disbForm.amount)*disbForm.quantity,quantity:disbForm.quantity,reference:disbForm.reference,branch_id:profile?.branch_id||null,status:'unbilled'},profile?.id);if(error){showAlert('Error: '+error.message,'error');return;}showAlert('✓ Disbursement added.');setShowDisbForm(false);load();}}>Add</button>
+            </div>
+          </div>);})()}
+        </div>
+      </div>)}
+    </>);
+  })()}
+</div>)}
+
+        {tab==='schedules'&&(<div style={C.main}>
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Fee Schedules</div><div style={{fontSize:11,color:'#444'}}>Billing rate cards for the firm</div></div>
+    <button style={C.btn('p')} onClick={()=>{setSchedForm({name:'',unit_rate:150,description:'',is_default:false});setShowSchedForm(true);}}>+ New Schedule</button>
+  </div>
+  <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Name','Rate per Unit (R)','Description','Default','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+    {!feeSchedules.length&&<tr><td colSpan={5} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No fee schedules yet. The default rate is R150/unit.</td></tr>}
+    {feeSchedules.map(s=>(<tr key={s.id}>
+      <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{s.name}</td>
+      <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>R{s.unit_rate||150}</td>
+      <td style={{...C.td,color:'#666'}}>{s.description||'—'}</td>
+      <td style={{...C.td,textAlign:'center'}}>{s.is_default?<span style={{color:'#8DC63F',fontWeight:700}}>✓ Default</span>:'—'}</td>
+      <td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{if(!confirm('Delete?'))return;await supabase.from('fee_schedules').update({is_active:false}).eq('id',s.id);load();}}>Archive</button></td>
+    </tr>))}
+  </tbody></table></div>
+  {showSchedForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowSchedForm(false)}>
+    <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:400}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:15,fontWeight:700,marginBottom:18}}>New Fee Schedule</div>
+      {(()=>{const lbl2={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};const inp2={background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'9px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',boxSizing:'border-box'};return(<div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div><label style={lbl2}>Schedule Name *</label><input style={inp2} type="text" placeholder="e.g. Standard, Litigation Rate" value={schedForm.name} onChange={e=>setSchedForm(f=>({...f,name:e.target.value}))}/></div>
+        <div><label style={lbl2}>Rate per Billing Unit (R) *</label><input style={inp2} type="number" value={schedForm.unit_rate} onChange={e=>setSchedForm(f=>({...f,unit_rate:parseFloat(e.target.value)||150}))}/></div>
+        <div><label style={lbl2}>Description</label><input style={inp2} type="text" placeholder="When to use this rate..." value={schedForm.description} onChange={e=>setSchedForm(f=>({...f,description:e.target.value}))}/></div>
+        <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#888',cursor:'pointer'}}><input type="checkbox" checked={schedForm.is_default} onChange={e=>setSchedForm(f=>({...f,is_default:e.target.checked}))}/> Set as firm default rate</label>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:6}}>
+          <button style={C.btn()} onClick={()=>setShowSchedForm(false)}>Cancel</button>
+          <button style={C.btn('p')} onClick={async()=>{if(!schedForm.name){showAlert('Name is required.','error');return;}const{error}=await saveFeeSchedule({name:schedForm.name,unit_rate:schedForm.unit_rate,description:schedForm.description,is_default:schedForm.is_default,is_active:true},profile?.id);if(error){showAlert('Error: '+error.message,'error');return;}showAlert('✓ Schedule saved.');setShowSchedForm(false);load();}}>Save</button>
+        </div>
+      </div>);})()}
+    </div>
+  </div>)}
 </div>)}
 
         {tab==='invoices'&&(<div style={C.main}>

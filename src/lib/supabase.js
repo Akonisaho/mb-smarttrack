@@ -280,6 +280,160 @@ export async function deleteInvoicePayment(id) {
   return { error };
 }
 
+// ── Clients ───────────────────────────────────────────────────────────
+export async function fetchClients({ branchId, isActive = true } = {}) {
+  let q = supabase.from('clients').select('*').order('full_name');
+  if (branchId) q = q.eq('branch_id', branchId);
+  if (isActive !== null) q = q.eq('is_active', isActive);
+  const { data, error } = await q;
+  if (error) console.error('fetchClients:', error.message);
+  return { clients: data || [] };
+}
+
+export async function fetchClient(id) {
+  const { data, error } = await supabase.from('clients').select('*').eq('id', id).single();
+  if (error) console.error('fetchClient:', error.message);
+  return { client: data };
+}
+
+export async function saveClient(client, userId) {
+  const payload = { ...client, updated_at: new Date().toISOString() };
+  const { data, error } = client.id
+    ? await supabase.from('clients').update(payload).eq('id', client.id).select()
+    : await supabase.from('clients').insert([{ ...payload, created_by: userId }]).select();
+  if (error) console.error('saveClient:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteClient(id) {
+  const { error } = await supabase.from('clients').update({ is_active: false }).eq('id', id);
+  if (error) console.error('deleteClient:', error.message);
+  return { error };
+}
+
+// ── FICA ──────────────────────────────────────────────────────────────
+export async function fetchFicaRecord(clientId) {
+  const { data, error } = await supabase.from('fica_records').select('*').eq('client_id', clientId).maybeSingle();
+  if (error) console.error('fetchFicaRecord:', error.message);
+  return { record: data };
+}
+
+export async function saveFicaRecord(record, userId) {
+  const payload = { ...record, updated_at: new Date().toISOString() };
+  const { data, error } = record.id
+    ? await supabase.from('fica_records').update(payload).eq('id', record.id).select()
+    : await supabase.from('fica_records').insert([{ ...payload, verified_by: userId }]).select();
+  if (error) console.error('saveFicaRecord:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function fetchAllFicaRecords() {
+  const { data, error } = await supabase.from('fica_records').select('*, clients(full_name, client_no, email)');
+  if (error) console.error('fetchAllFicaRecords:', error.message);
+  return { records: data || [] };
+}
+
+// ── Disbursements ─────────────────────────────────────────────────────
+export async function fetchDisbursements({ matterId, userId, status, all } = {}) {
+  let q = supabase.from('disbursements').select('*').order('date', { ascending: false });
+  if (matterId) q = q.eq('matter_id', matterId);
+  if (userId && !all) q = q.eq('user_id', userId);
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) console.error('fetchDisbursements:', error.message);
+  return { disbursements: data || [] };
+}
+
+export async function saveDisbursement(disb, userId) {
+  const payload = { ...disb, updated_at: new Date().toISOString() };
+  const { data, error } = disb.id
+    ? await supabase.from('disbursements').update(payload).eq('id', disb.id).select()
+    : await supabase.from('disbursements').insert([{ ...payload, user_id: userId }]).select();
+  if (error) console.error('saveDisbursement:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteDisbursement(id) {
+  const { error } = await supabase.from('disbursements').delete().eq('id', id);
+  if (error) console.error('deleteDisbursement:', error.message);
+  return { error };
+}
+
+export async function markDisbursementsBilled(ids, invoiceId) {
+  const { error } = await supabase.from('disbursements')
+    .update({ status: 'billed', invoice_id: invoiceId, updated_at: new Date().toISOString() })
+    .in('id', ids);
+  if (error) console.error('markDisbursementsBilled:', error.message);
+  return { error };
+}
+
+// ── Fee Schedules ─────────────────────────────────────────────────────
+export async function fetchFeeSchedules() {
+  const { data, error } = await supabase.from('fee_schedules').select('*').eq('is_active', true).order('name');
+  if (error) console.error('fetchFeeSchedules:', error.message);
+  return { schedules: data || [] };
+}
+
+export async function saveFeeSchedule(schedule, userId) {
+  const payload = { ...schedule };
+  const { data, error } = schedule.id
+    ? await supabase.from('fee_schedules').update(payload).eq('id', schedule.id).select()
+    : await supabase.from('fee_schedules').insert([{ ...payload, created_by: userId }]).select();
+  if (error) console.error('saveFeeSchedule:', error.message);
+  return { data: data?.[0], error };
+}
+
+// ── Documents ─────────────────────────────────────────────────────────
+export async function fetchDocuments({ matterId, clientId, userId } = {}) {
+  let q = supabase.from('documents').select('*').order('uploaded_at', { ascending: false });
+  if (matterId) q = q.eq('matter_id', matterId);
+  if (clientId) q = q.eq('client_id', clientId);
+  if (userId)   q = q.eq('user_id', userId);
+  const { data, error } = await q;
+  if (error) console.error('fetchDocuments:', error.message);
+  return { documents: data || [] };
+}
+
+export async function uploadDocument(file, { matterId, clientId, documentType, description, userId, branchId }) {
+  const ext = file.name.split('.').pop();
+  const path = `${matterId || clientId}/${Date.now()}.${ext}`;
+  const { error: upErr } = await supabase.storage.from('matter-documents').upload(path, file);
+  if (upErr) { console.error('uploadDocument storage:', upErr.message); return { error: upErr }; }
+  const { data: urlData } = supabase.storage.from('matter-documents').getPublicUrl(path);
+  const { data, error } = await supabase.from('documents').insert([{
+    matter_id: matterId || null, client_id: clientId || null,
+    user_id: userId, branch_id: branchId || null,
+    file_name: file.name, file_path: path, file_size: file.size,
+    mime_type: file.type, document_type: documentType || 'other',
+    description, public_url: urlData?.publicUrl,
+  }]).select();
+  if (error) console.error('uploadDocument db:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteDocument(id, filePath) {
+  await supabase.storage.from('matter-documents').remove([filePath]);
+  const { error } = await supabase.from('documents').delete().eq('id', id);
+  if (error) console.error('deleteDocument:', error.message);
+  return { error };
+}
+
+// ── Client Portal ─────────────────────────────────────────────────────
+export async function fetchPortalAccess(token) {
+  const { data, error } = await supabase.from('client_portal_access')
+    .select('*, clients(*)').eq('token', token).eq('is_active', true).maybeSingle();
+  if (error) console.error('fetchPortalAccess:', error.message);
+  return { access: data };
+}
+
+export async function createPortalAccess(clientId, email, createdBy) {
+  const token = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const { data, error } = await supabase.from('client_portal_access')
+    .insert([{ client_id: clientId, email, token, is_active: true, created_by: createdBy }]).select();
+  if (error) console.error('createPortalAccess:', error.message);
+  return { data: data?.[0], token, error };
+}
+
 // ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
