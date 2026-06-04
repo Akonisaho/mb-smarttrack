@@ -252,7 +252,7 @@ export default function ClientsPage() {
                     <td style={{...C.td,fontFamily:'monospace',color:outstanding>0?'#EAB308':'#333'}}>{outstanding>0?fmtR(outstanding):'—'}</td>
                     <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:fst.bg,color:fst.color,border:`1px solid ${fst.color}44`,fontWeight:600}}>{fst.label}</span></td>
                     <td style={C.td} onClick={e=>e.stopPropagation()}>
-                      <div style={{display:'flex',gap:4'}}>
+                      <div style={{display:'flex',gap:4}}>
                         <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>openEdit(c)}>Edit</button>
                         <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>openFicaEdit(c)}>FICA</button>
                         <button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={()=>handleDelete(c.id,c.full_name)}>Archive</button>
