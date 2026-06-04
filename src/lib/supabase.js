@@ -298,9 +298,15 @@ export async function fetchClient(id) {
 
 export async function saveClient(client, userId) {
   const payload = { ...client, updated_at: new Date().toISOString() };
+  if (!client.id) {
+    // Auto-generate client number e.g. MB-C-0042
+    const { count } = await supabase.from('clients').select('*', { count:'exact', head:true });
+    payload.client_no = `MB-C-${String((count||0)+1).padStart(4,'0')}`;
+    payload.created_by = userId;
+  }
   const { data, error } = client.id
     ? await supabase.from('clients').update(payload).eq('id', client.id).select()
-    : await supabase.from('clients').insert([{ ...payload, created_by: userId }]).select();
+    : await supabase.from('clients').insert([payload]).select();
   if (error) console.error('saveClient:', error.message);
   return { data: data?.[0], error };
 }
@@ -396,19 +402,26 @@ export async function fetchDocuments({ matterId, clientId, userId } = {}) {
 
 export async function uploadDocument(file, { matterId, clientId, documentType, description, userId, branchId }) {
   const ext = file.name.split('.').pop();
-  const path = `${matterId || clientId}/${Date.now()}.${ext}`;
-  const { error: upErr } = await supabase.storage.from('matter-documents').upload(path, file);
+  const path = `${userId}/${matterId || clientId || 'general'}/${Date.now()}.${ext}`;
+  const { error: upErr } = await supabase.storage.from('matter-documents').upload(path, file, { upsert: false });
   if (upErr) { console.error('uploadDocument storage:', upErr.message); return { error: upErr }; }
-  const { data: urlData } = supabase.storage.from('matter-documents').getPublicUrl(path);
   const { data, error } = await supabase.from('documents').insert([{
     matter_id: matterId || null, client_id: clientId || null,
     user_id: userId, branch_id: branchId || null,
     file_name: file.name, file_path: path, file_size: file.size,
     mime_type: file.type, document_type: documentType || 'other',
-    description, public_url: urlData?.publicUrl,
+    description, public_url: null,
   }]).select();
   if (error) console.error('uploadDocument db:', error.message);
   return { data: data?.[0], error };
+}
+
+export async function getDocumentUrl(filePath) {
+  const { data, error } = await supabase.storage
+    .from('matter-documents')
+    .createSignedUrl(filePath, 3600);
+  if (error) console.error('getDocumentUrl:', error.message);
+  return { url: data?.signedUrl, error };
 }
 
 export async function deleteDocument(id, filePath) {

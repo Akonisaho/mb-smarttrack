@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchDocuments, uploadDocument, deleteDocument } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchDocuments, uploadDocument, deleteDocument, getDocumentUrl } from '../lib/supabase';
 
 function fdate(d){ try{return new Date(d).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'});}catch{return d||'';} }
 function fsize(b){ if(!b)return'—'; if(b<1024)return b+'B'; if(b<1048576)return(b/1024).toFixed(1)+'KB'; return(b/1048576).toFixed(1)+'MB'; }
@@ -73,6 +73,12 @@ export default function DocumentsPage() {
     setSelectedFile(null);
     setUploadForm({ matterId:'', clientId:'', documentType:'other', description:'' });
     load();
+  }
+
+  async function handleView(doc) {
+    const { url, error } = await getDocumentUrl(doc.file_path);
+    if (error || !url) { showMsg('Could not load file.', 'error'); return; }
+    window.open(url, '_blank');
   }
 
   async function handleDelete(doc) {
@@ -158,7 +164,7 @@ export default function DocumentsPage() {
                 return(<tr key={doc.id}>
                   <td style={{...C.td,width:28,textAlign:'center'}}>{DOC_ICONS[doc.document_type]||'📎'}</td>
                   <td style={{...C.td,fontWeight:500,color:'#D0D0D0',maxWidth:200}}>
-                    {doc.public_url?<a href={doc.public_url} target="_blank" rel="noreferrer" style={{color:'#D0D0D0',textDecoration:'none'}}>{doc.file_name}</a>:doc.file_name}
+                    <span style={{cursor:'pointer',textDecoration:'underline',textDecorationColor:'#333'}} onClick={()=>handleView(doc)}>{doc.file_name}</span>
                   </td>
                   <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:'rgba(74,144,217,0.1)',color:'#4A90D9',textTransform:'capitalize'}}>{doc.document_type}</span></td>
                   <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{matter?`${matter.id} · ${matter.client}`:'—'}</td>
@@ -167,7 +173,7 @@ export default function DocumentsPage() {
                   <td style={{...C.td,color:'#555'}}>{fdate(doc.uploaded_at)}</td>
                   <td style={C.td}>
                     <div style={{display:'flex',gap:4}}>
-                      {doc.public_url&&<a href={doc.public_url} target="_blank" rel="noreferrer" style={{...C.btn(),textDecoration:'none',fontSize:10,padding:'3px 8px'}}>View</a>}
+                      <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>handleView(doc)}>View</button>
                       <button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={()=>handleDelete(doc)}>Delete</button>
                     </div>
                   </td>
