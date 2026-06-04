@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Fuse from 'fuse.js';
+import Sidebar from '../components/Sidebar';
 import {
   supabase, signOut, getProfile,
   fetchActivities, fetchAllActivities, patchActivity, patchActivityMatter,
@@ -478,8 +479,9 @@ const rFormDirty=useRef(false);
   const filtActs=allActs.filter(a=>{ if(filterCls&&a.classification!==filterCls) return false; if(filterDate&&a.date!==filterDate) return false; if(filterApp&&a.app_display_name!==filterApp) return false; return true; }).sort((a,b)=>b.start_time-a.start_time);
 
   const C={
-    page:{background:'#0A0A0A',minHeight:'100vh',fontFamily:'system-ui,sans-serif',color:'#F0F0F0'},
-    hdr:{background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
+    page:{background:'#0A0A0A',minHeight:'100vh',fontFamily:'system-ui,sans-serif',color:'#F0F0F0',display:'flex'},
+    content:{flex:1,minWidth:0,display:'flex',flexDirection:'column'},
+    hdr:{background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:48,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
     mark:{background:'#000',border:'1px solid #252525',borderRadius:7,width:34,height:34,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14,letterSpacing:'-0.06em'},
     ntab:(on)=>({background:'transparent',border:`1px solid ${on?'#2A2A2A':'transparent'}`,color:on?'#F0F0F0':'#555',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:on?600:400}),
     pill:{display:'flex',alignItems:'center',gap:6,background:'rgba(108,192,74,0.08)',border:'1px solid rgba(108,192,74,0.2)',borderRadius:20,padding:'4px 12px',fontSize:11,color:'#6CC04A'},
@@ -700,26 +702,21 @@ const rFormDirty=useRef(false);
     <Head><title>MB SmartTrack</title></Head>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}table tr:hover td{background:rgba(108,192,74,0.025)}button:hover{opacity:.85}select option{background:#1A1A1A;color:#F0F0F0}input[type=date],input[type=month]{color-scheme:dark}input:focus,select:focus{outline:1px solid rgba(108,192,74,0.4);outline-offset:1px}`}</style>
     <div style={C.page}>
+      <Sidebar
+        role={profile?.role==='bookkeeper'?'bookkeeper':'attorney'}
+        tab={tab}
+        setTab={setTab}
+        profile={profile}
+        onSignOut={async()=>{await signOut();router.replace('/login');}}
+        pendingCount={pendingPayments.length}
+      />
+      <div style={C.content}>
       <div style={C.hdr}>
+        <div style={{fontSize:12,color:'#555',fontWeight:500,paddingLeft:48}}>{profile?.full_name}</div>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          {profile?.role==='manager'&&<button style={{background:'transparent',border:'1px solid rgba(108,192,74,0.3)',color:'#6CC04A',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/manager')}>Manager View</button>}
-          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/calendar')}>📅 Calendar</button>
-          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>router.push('/documents')}>📂 Docs</button>
-          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>setShowPwdForm(true)}>🔒 Password</button>
-<button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
-          <div style={C.mark}>M<span style={{color:'#6CC04A'}}>B</span></div>
-          <div><div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack</div><div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill</div></div>
-        </div>
-        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-          {(profile?.role==='bookkeeper'?[['trust','🏦 Trust'],['invoices','Invoice'],['archive','Archive']]:[['today','Today'],['history','History'],['matters','Matters'],['disbursements','Costs'],['analytics','Analytics'],['activities','All Activities'],['invoices','Invoice'],['archive','Archive'],['trust','🏦 Trust']]).map(([v,l])=>(
-            <button key={v} style={{...C.ntab(tab===v),color:v==='trust'?'#4A90D9':tab===v?'#F0F0F0':'#555',border:v==='trust'?`1px solid ${tab===v?'rgba(74,144,217,0.5)':'rgba(74,144,217,0.2)'}`:tab===v?'1px solid #2A2A2A':'1px solid transparent',position:'relative'}} onClick={()=>setTab(v)}>
-              {l}{v==='trust'&&pendingPayments.length>0&&<span style={{position:'absolute',top:-4,right:-4,background:'#EAB308',color:'#000',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>{pendingPayments.length}</span>}
-            </button>
-          ))}
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <div style={{position:'relative'}}><input ref={searchRef} style={{background:'#1A1A1A',border:`1px solid ${searchQuery?'rgba(108,192,74,0.4)':'#252525'}`,color:'#F0F0F0',padding:'5px 12px 5px 32px',borderRadius:20,fontSize:12,fontFamily:'inherit',width:200,outline:'none'}} placeholder="Search everything..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',fontSize:13,pointerEvents:'none'}}>{searching?'⌛':'🔍'}</span>{searchQuery&&<button style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'#666',cursor:'pointer',fontSize:12,padding:0}} onClick={()=>setSearchQuery('')}>✕</button>}</div>
-          {online?<div style={C.pill}><div style={C.dot}/>{clock}</div>:<span style={{fontSize:11,color:'#3A3A3A'}}>Backend offline</span>}
+          <div style={{position:'relative'}}><input ref={searchRef} style={{background:'#1A1A1A',border:`1px solid ${searchQuery?'rgba(108,192,74,0.4)':'#252525'}`,color:'#F0F0F0',padding:'5px 12px 5px 32px',borderRadius:20,fontSize:12,fontFamily:'inherit',width:180,outline:'none'}} placeholder="Search..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/><span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',fontSize:13,pointerEvents:'none'}}>{searching?'⌛':'🔍'}</span>{searchQuery&&<button style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'#666',cursor:'pointer',fontSize:12,padding:0}} onClick={()=>setSearchQuery('')}>✕</button>}</div>
+          <button style={{background:'transparent',border:'1px solid #252525',color:'#555',padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit'}} onClick={()=>setShowPwdForm(true)}>🔒</button>
+          {online?<div style={C.pill}><div style={C.dot}/>{clock}</div>:<span style={{fontSize:11,color:'#3A3A3A'}}>Offline</span>}
         </div>
       </div>
 
@@ -861,5 +858,6 @@ const rFormDirty=useRef(false);
 )}
 
     {viewInv&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'center',overflowY:'auto',padding:'40px 20px'}} onClick={()=>setViewInv(null)}><div style={{background:'#111',border:'1px solid #252525',borderRadius:12,padding:24,maxWidth:780,width:'100%'}} onClick={e=>e.stopPropagation()}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:14,fontWeight:700}}>{viewInv.id}</div><div style={{fontSize:11,color:'#555'}}>{viewInv.client} · <span style={{color:'#A78BFA'}}>{viewInv.matter_id||viewInv.matter_name}</span></div></div><div style={{display:'flex',gap:8}}><button style={C.btn('g')} onClick={()=>downloadPDF(viewInv,allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id)))}>⬇ PDF</button><button style={C.btn('r')} onClick={async()=>{if(!confirm(`Delete ${viewInv.id}?`)) return;await deleteInvoice(viewInv.id);setViewInv(null);load();}}>Delete</button><button style={C.btn()} onClick={()=>setViewInv(null)}>Close</button></div></div><InvoiceDoc inv={viewInv} acts={allActs.filter(a=>(viewInv.activity_ids||[]).includes(a.id))}/></div></div>)}
+      </div>{/* end C.content */}
   </>);
 }
