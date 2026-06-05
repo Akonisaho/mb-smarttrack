@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice, fetchCreditNotes, saveCreditNote, writeOffInvoice, undoWriteOff } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice, fetchCreditNotes, saveCreditNote, writeOffInvoice, undoWriteOff, fetchMatterNotes, saveMatterNote, deleteMatterNote, fetchUndertakings, saveUndertaking, fulfillUndertaking, deleteUndertaking, fetchClientCommunications, saveClientCommunication, deleteClientCommunication, fetchAuditLog, logAudit, saveInterestCharge, updateMatter } from '../lib/supabase';
 import NavBar from '../components/NavBar';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
@@ -79,6 +79,22 @@ export default function Manager() {
   const [cnForm,setCnForm]                 = useState({amount:'',reason:''});
   const [savingCN,setSavingCN]             = useState(false);
   const [emailingInv,setEmailingInv]       = useState(null);
+  const [undertakings,setUndertakings]     = useState([]);
+  const [showUTForm,setShowUTForm]         = useState(false);
+  const [utForm,setUtForm]                 = useState({matter_id:'',direction:'given',description:'',given_to:'',due_date:'',notes:''});
+  const [communications,setCommunications] = useState([]);
+  const [showCommForm,setShowCommForm]     = useState(false);
+  const [commForm,setCommForm]             = useState({client_id:'',matter_id:'',comm_type:'call',direction:'outbound',subject:'',body:'',comm_date:new Date().toLocaleDateString('en-CA')});
+  const [auditLogs,setAuditLogs]           = useState([]);
+  const [auditLoading,setAuditLoading]     = useState(false);
+  const [mgrNotesMatter,setMgrNotesMatter] = useState(null);
+  const [mgrNotesMap,setMgrNotesMap]       = useState({});
+  const [mgrNoteText,setMgrNoteText]       = useState('');
+  const [mgrNoteType,setMgrNoteType]       = useState('general');
+  const [savingMgrNote,setSavingMgrNote]   = useState(false);
+  const [vatPeriod,setVatPeriod]           = useState(new Date().toLocaleDateString('en-CA').substring(0,7));
+  const [closingMatter,setClosingMatter]   = useState(null);
+  const [closureForm,setClosureForm]       = useState({closure_notes:''});
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -134,6 +150,12 @@ export default function Manager() {
   },[selDate]);
 
   useEffect(()=>{ if(!loading){ load(); const t=setInterval(load,30000); return()=>clearInterval(t); } },[loading,load]);
+
+  useEffect(()=>{
+    if(tab==='undertakings'&&!loading) fetchUndertakings({}).then(r=>setUndertakings(r.undertakings||[]));
+    if(tab==='communications'&&!loading) fetchClientCommunications({}).then(r=>setCommunications(r.communications||[]));
+    if(tab==='audit'&&!loading){ setAuditLoading(true); fetchAuditLog({}).then(r=>{setAuditLogs(r.logs||[]);setAuditLoading(false);}); }
+  },[tab,loading]);
 
 
   useEffect(()=>{
@@ -215,8 +237,16 @@ export default function Manager() {
   }
 
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
-  async function handleSaveCreditNote(){ if(!cnForm.amount||!cnForm.reason.trim()||!cnInvoice) return; setSavingCN(true); const{error}=await saveCreditNote({invoiceId:cnInvoice.id,client:cnInvoice.client,matterId:cnInvoice.matter_id,amount:cnForm.amount,reason:cnForm.reason},profile?.id); setSavingCN(false); if(error){showAlert('Error: '+error.message,'error');return;} const{creditNotes:cn}=await fetchCreditNotes(null); setCreditNotes(cn); setShowCNForm(false);setCnInvoice(null);setCnForm({amount:'',reason:''});showAlert('✓ Credit note issued.'); }
-  async function handleEmailInvoice(inv,customEmail){ setEmailingInv(inv.id); const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})}); const data=await res.json(); setEmailingInv(null); if(!res.ok){showAlert('Could not send: '+(data.error||'Unknown error'),'error');return;} showAlert(data.warning||`✓ Invoice emailed to ${data.sentTo}`); }
+  async function handleSaveCreditNote(){ if(!cnForm.amount||!cnForm.reason.trim()||!cnInvoice) return; setSavingCN(true); const{error}=await saveCreditNote({invoiceId:cnInvoice.id,client:cnInvoice.client,matterId:cnInvoice.matter_id,amount:cnForm.amount,reason:cnForm.reason},profile?.id); setSavingCN(false); if(error){showAlert('Error: '+error.message,'error');return;} const{creditNotes:cn}=await fetchCreditNotes(null); setCreditNotes(cn); setShowCNForm(false);setCnInvoice(null);setCnForm({amount:'',reason:''});showAlert('✓ Credit note issued.'); await logAudit('credit_note_issued','invoice',cnInvoice.id,{amount:cnForm.amount,reason:cnForm.reason},profile?.id); }
+  async function handleEmailInvoice(inv,customEmail){ setEmailingInv(inv.id); const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})}); const data=await res.json(); setEmailingInv(null); if(!res.ok){showAlert('Could not send: '+(data.error||'Unknown error'),'error');return;} showAlert(data.warning||`✓ Invoice emailed to ${data.sentTo}`); await logAudit('invoice_emailed','invoice',inv.id,{sentTo:customEmail},profile?.id); }
+
+  async function loadMgrNotes(matterId){ const{notes}=await fetchMatterNotes(matterId); setMgrNotesMap(m=>({...m,[matterId]:notes})); }
+  async function handleSaveMgrNote(matterId){ if(!mgrNoteText.trim()) return; setSavingMgrNote(true); const{data,error}=await saveMatterNote({matterId,note:mgrNoteText.trim(),noteType:mgrNoteType},profile?.id); setSavingMgrNote(false); if(error) return; setMgrNoteText(''); setMgrNotesMap(m=>({...m,[matterId]:[data,...(m[matterId]||[])]})); }
+  async function handleSaveUndertaking(){ if(!utForm.description.trim()||!utForm.matter_id) return; const{error}=await saveUndertaking({...utForm},profile?.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Undertaking saved.'); setShowUTForm(false); setUtForm({matter_id:'',direction:'given',description:'',given_to:'',due_date:'',notes:''}); const{undertakings:ut}=await fetchUndertakings({}); setUndertakings(ut); await logAudit('undertaking_created','matter',utForm.matter_id,{description:utForm.description},profile?.id); }
+  async function handleSaveComm(){ if(!commForm.body.trim()) return; const{error}=await saveClientCommunication({...commForm},profile?.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Communication logged.'); setShowCommForm(false); setCommForm({client_id:'',matter_id:'',comm_type:'call',direction:'outbound',subject:'',body:'',comm_date:new Date().toLocaleDateString('en-CA')}); const{communications:co}=await fetchClientCommunications({}); setCommunications(co); await logAudit('communication_logged','client',commForm.client_id,{type:commForm.comm_type},profile?.id); }
+  async function handleCloseMatter(m){ if(!closureForm.closure_notes.trim()){showAlert('Please add closure notes.','error');return;} const{error}=await updateMatter(m.id,{status:'closed',closure_notes:closureForm.closure_notes,closed_at:new Date().toISOString(),closed_by:profile?.id}); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ Matter ${m.id} closed.`); setClosingMatter(null); setClosureForm({closure_notes:''}); load(); await logAudit('matter_closed','matter',m.id,{notes:closureForm.closure_notes},profile?.id); }
+  async function handleAddInterest(inv){ const age=Math.floor((new Date()-new Date(inv.created_at||0))/86400000); const rate=10.5; const outstanding=Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0)); const interest=parseFloat((outstanding*(rate/100)*(age/365)).toFixed(2)); if(interest<=0){showAlert('No interest due — invoice is not overdue.','error');return;} if(!confirm(`Add R${interest} interest charge (${rate}% p.a. × ${age} days) to invoice ${inv.id}?`)) return; const{error}=await saveInterestCharge({invoiceId:inv.id,amount:interest,ratePercent:rate,daysOverdue:age},profile?.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ Interest charge of R${interest} added.`); await logAudit('interest_charged','invoice',inv.id,{amount:interest,days:age},profile?.id); }
+  async function sendOverdueReminders(){ const now=new Date(); const overdue=invoices.filter(inv=>{ const age=Math.floor((now-new Date(inv.created_at||0))/86400000); const paid=invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0); return age>30&&Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid)>0&&!inv.written_off; }); if(!overdue.length){showAlert('No overdue invoices to remind.','error');return;} let sent=0; for(const inv of overdue){ const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,type:'reminder'})}); if(res.ok) sent++; } showAlert(`✓ Sent ${sent} overdue reminders.`); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
@@ -819,6 +849,255 @@ export default function Manager() {
                 <button style={{...C.btn('p'),opacity:inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId?0.6:1}} disabled={inviting||!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId} onClick={handleInvite}>{inviting?'Creating account...':'Add Staff Member'}</button>
               </div>
             </div>
+          </div>
+        </div>)}
+
+        {/* ── MATTERS TAB ──────────────────────────────────── */}
+        {tab==='matters'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>All Matters</div><div style={{fontSize:11,color:'#444'}}>{matters.length} matters · firm-wide</div></div>
+            <div style={{display:'flex',gap:8}}><select style={C.sel} value={selBranch} onChange={e=>setSelBranch(e.target.value)}><option value="all">All branches</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+          </div>
+          {!matters.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📁</div><div>No matters yet</div></div>):matters.filter(m=>selBranch==='all'||profiles.find(p=>p.id===m.user_id)?.branch_id===selBranch).map(m=>{
+            const atty=profiles.find(p=>p.id===m.user_id);
+            const trustBal=trustBalances[m.id]||0;
+            const prescDue=m.prescription_date?Math.floor((new Date(m.prescription_date)-new Date())/86400000):null;
+            const prescWarn=prescDue!==null&&prescDue<=30;
+            return(<div key={m.id} style={{...C.card,border:prescWarn?'1px solid rgba(220,80,80,0.4)':m.status==='closed'?'1px solid #1A1A1A':'1px solid #1A1A1A',opacity:m.status==='closed'?0.6:1}}>
+              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11,color:'#A78BFA',fontFamily:'monospace',fontWeight:600}}>{m.id}</span>
+                    <span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:m.status==='closed'?'rgba(85,85,85,0.2)':'rgba(141,198,63,0.1)',color:m.status==='closed'?'#555':'#8DC63F',fontWeight:600}}>{m.status||'open'}</span>
+                    {prescWarn&&<span style={{fontSize:9,color:'#E05252',border:'1px solid rgba(220,80,80,0.4)',padding:'1px 8px',borderRadius:20}}>⚠ Prescribes in {prescDue}d</span>}
+                    {m.budget_units>0&&<span style={{fontSize:9,color:'#4A90D9',border:'1px solid rgba(74,144,217,0.3)',padding:'1px 8px',borderRadius:20}}>Budget: {m.budget_units} units</span>}
+                  </div>
+                  <div style={{fontSize:14,fontWeight:700,color:'#E0E0E0',marginBottom:2}}>{m.name}</div>
+                  <div style={{fontSize:12,color:'#888'}}>Client: <strong style={{color:'#C0C0C0'}}>{m.client}</strong> · Attorney: <span style={{color:'#4A90D9'}}>{atty?.full_name||'—'}</span></div>
+                  {m.prescription_date&&<div style={{fontSize:10,color:prescWarn?'#E05252':'#555',marginTop:3}}>Prescription: {fmtDate(m.prescription_date)}</div>}
+                  {m.next_action_date&&<div style={{fontSize:10,color:'#EAB308',marginTop:2}}>Next action: {fmtDate(m.next_action_date)}</div>}
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-start'}}>
+                  <div style={{textAlign:'center',minWidth:50}}><div style={{fontSize:9,color:'#555',marginBottom:2}}>Trust</div><div style={{fontSize:14,fontWeight:700,color:trustBal>0?'#4A90D9':'#444'}}>{fmtR(trustBal)}</div></div>
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    <button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={()=>{const nid=mgrNotesMatter===m.id?null:m.id;setMgrNotesMatter(nid);if(nid&&!mgrNotesMap[m.id])loadMgrNotes(m.id);}}>📝 {mgrNotesMap[m.id]?.length>0?`Notes (${mgrNotesMap[m.id].length})`:'Notes'}</button>
+                    {m.status!=='closed'&&<button style={{...C.btn('r'),fontSize:11,padding:'4px 10px'}} onClick={()=>{setClosingMatter(m);setClosureForm({closure_notes:''});}}>Close</button>}
+                    {m.status==='closed'&&<button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={async()=>{await updateMatter(m.id,{status:'open',closed_at:null,closed_by:null});load();}}>Reopen</button>}
+                  </div>
+                </div>
+              </div>
+              {mgrNotesMatter===m.id&&(<div style={{borderTop:'1px solid #1A1A1A',marginTop:12,paddingTop:12}}>
+                <div style={{display:'flex',gap:8,marginBottom:10}}>
+                  <select style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'5px 8px',borderRadius:5,fontSize:11,fontFamily:'inherit'}} value={mgrNoteType} onChange={e=>setMgrNoteType(e.target.value)}>{['general','call','email','meeting','instruction','court'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select>
+                  <textarea style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'8px 10px',borderRadius:5,fontSize:12,fontFamily:'inherit',flex:1,minHeight:48,resize:'vertical'}} placeholder="Add a note..." value={mgrNoteText} onChange={e=>setMgrNoteText(e.target.value)}/>
+                  <button style={{...C.btn('p'),padding:'6px 12px',flexShrink:0,alignSelf:'flex-start'}} disabled={savingMgrNote||!mgrNoteText.trim()} onClick={()=>handleSaveMgrNote(m.id)}>{savingMgrNote?'…':'Save'}</button>
+                </div>
+                {!(mgrNotesMap[m.id]||[]).length&&<div style={{fontSize:11,color:'#333',textAlign:'center',padding:'8px 0'}}>No notes yet.</div>}
+                {(mgrNotesMap[m.id]||[]).map(n=>(<div key={n.id} style={{display:'flex',gap:8,marginBottom:6,padding:'8px 10px',background:'#0D0D0D',borderRadius:6}}>
+                  <div style={{flex:1}}><div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginBottom:3}}><span style={{fontSize:9,padding:'1px 7px',borderRadius:20,background:'rgba(74,144,217,0.1)',color:'#4A90D9',fontWeight:600,textTransform:'capitalize'}}>{n.note_type}</span><span style={{fontSize:10,color:'#555'}}>{n.profiles?.full_name}</span><span style={{fontSize:9,color:'#333'}}>{new Date(n.created_at).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})}</span></div><div style={{fontSize:12,color:'#C8C8C8',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{n.note}</div></div>
+                  <button style={{background:'none',border:'none',color:'#2A2A2A',cursor:'pointer',fontSize:14,flexShrink:0}} onClick={async()=>{await deleteMatterNote(n.id);loadMgrNotes(m.id);}}>✕</button>
+                </div>))}
+              </div>)}
+            </div>);
+          })}
+        </div>)}
+
+        {/* ── VAT REPORT TAB ───────────────────────────────── */}
+        {tab==='vat'&&(<div style={C.main}>
+          {(()=>{
+            const [fy,fm]=vatPeriod.split('-').map(Number);
+            const periodInvs=invoices.filter(i=>{ const d=i.created_at?.substring(0,7); return d===vatPeriod; });
+            const periodDisbs=disbursements.filter(d=>d.date?.substring(0,7)===vatPeriod&&d.vat_applicable);
+            const outputExcl=periodInvs.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0);
+            const outputVat=outputExcl*0.15;
+            const inputVat=periodDisbs.reduce((s,d)=>s+Number(d.amount)*0.15,0);
+            const vatPayable=outputVat-inputVat;
+            return(<>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+                <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>VAT Report — VAT201 Supporting Schedule</div><div style={{fontSize:11,color:'#444'}}>Output VAT collected minus Input VAT on disbursements</div></div>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}><input type="month" style={C.sel} value={vatPeriod} onChange={e=>setVatPeriod(e.target.value)}/></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+                {[{l:'Output VAT (excl.)',v:fmtR(outputExcl),s:'invoiced excl. VAT',a:true},{l:'Output VAT (15%)',v:fmtR(outputVat),s:'VAT collected',a:true},{l:'Input VAT',v:fmtR(inputVat),s:'VAT on disbursements',w:false},{l:'VAT Payable to SARS',v:fmtR(vatPayable),s:vatPayable>0?'Due to SARS':'VAT credit',w:vatPayable>0,a:vatPayable<=0}].map(({l,v,s,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+              </div>
+              <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Output VAT — Invoices ({new Date(vatPeriod+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'})})</div>
+                {!periodInvs.length?<div style={{textAlign:'center',padding:30,color:'#555',fontSize:12}}>No invoices for this period</div>:
+                <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Matter','Excl. VAT','VAT 15%','Incl. VAT'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+                  {periodInvs.map(inv=>{const e=(inv.total_units||0)*(inv.rate||150),v=e*0.15;return(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={C.td}>{inv.client}</td><td style={{...C.td,color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{fmtR(e)}</td><td style={{...C.td,fontFamily:'monospace',color:'#EAB308'}}>{fmtR(v)}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>{fmtR(e+v)}</td></tr>);})}
+                  <tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={3} style={C.th}>TOTAL</td><td style={{...C.th,fontFamily:'monospace',color:'#8DC63F'}}>{fmtR(outputExcl)}</td><td style={{...C.th,fontFamily:'monospace',color:'#EAB308'}}>{fmtR(outputVat)}</td><td style={{...C.th,fontFamily:'monospace',color:'#8DC63F'}}>{fmtR(outputExcl+outputVat)}</td></tr>
+                </tbody></table>}
+              </div>
+              <div style={{...C.card,marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0'}}>VAT201 Summary</div><button style={C.btn('p')} onClick={()=>{ const txt=`VAT RETURN SUMMARY\nPeriod: ${new Date(vatPeriod+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'})}\n\nField 1 - Standard Rated Supplies: R${outputExcl.toFixed(2)}\nField 4 - Output Tax: R${outputVat.toFixed(2)}\nField 15 - Input Tax (Disbursements): R${inputVat.toFixed(2)}\nField 20 - VAT Payable: R${vatPayable.toFixed(2)}\n\nVAT Reg No: ${profile?.vat_number||'[Add VAT number in Settings]'}`; navigator.clipboard.writeText(txt); showAlert('✓ VAT summary copied to clipboard'); }}>📋 Copy for VAT201</button></div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                  {[['Field 1','Standard rated supplies (excl. VAT)',fmtR(outputExcl)],['Field 4','Output Tax (VAT collected)',fmtR(outputVat)],['Field 15','Input Tax (VAT on disbursements)',fmtR(inputVat)],['Field 20','VAT payable to SARS',fmtR(vatPayable)]].map(([f,l,v])=>(<div key={f} style={{background:'#0D0D0D',borderRadius:6,padding:'10px 12px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:2}}>{f} — {l}</div><div style={{fontSize:16,fontWeight:700,color:'#8DC63F'}}>{v}</div></div>))}
+                </div>
+              </div>
+            </>);
+          })()}
+        </div>)}
+
+        {/* ── UNDERTAKINGS TAB ─────────────────────────────── */}
+        {tab==='undertakings'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Undertakings Register</div><div style={{fontSize:11,color:'#444'}}>Track undertakings given and received per matter</div></div>
+            <button style={C.btn('p')} onClick={()=>{setUtForm({matter_id:matters[0]?.id||'',direction:'given',description:'',given_to:'',due_date:'',notes:''});setShowUTForm(true);}}>+ New Undertaking</button>
+          </div>
+          {(()=>{
+            const pending=undertakings.filter(u=>u.status==='pending');
+            const overdue=undertakings.filter(u=>u.due_date&&new Date(u.due_date)<new Date()&&u.status==='pending');
+            return(<>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+                {[{l:'Total',v:undertakings.length,s:'all undertakings'},{l:'Pending',v:pending.length,s:'awaiting fulfilment',w:pending.length>0},{l:'Overdue',v:overdue.length,s:'past due date',w:overdue.length>0}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+              </div>
+              {!undertakings.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>🤝</div><div>No undertakings yet</div></div>):
+              <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter','Direction','Description','Given To','Due Date','Status','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+                {undertakings.map(u=>{
+                  const isOverdue=u.due_date&&new Date(u.due_date)<new Date()&&u.status==='pending';
+                  return(<tr key={u.id}>
+                    <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{u.matter_id}</td>
+                    <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:u.direction==='given'?'rgba(74,144,217,0.1)':'rgba(167,139,250,0.1)',color:u.direction==='given'?'#4A90D9':'#A78BFA',fontWeight:600}}>{u.direction}</span></td>
+                    <td style={{...C.td,color:'#C8C8C8',maxWidth:200}}>{u.description}</td>
+                    <td style={{...C.td,color:'#777',fontSize:10}}>{u.given_to||'—'}</td>
+                    <td style={{...C.td,fontFamily:'monospace',color:isOverdue?'#E05252':'#888',fontWeight:isOverdue?700:400}}>{u.due_date?fmtDate(u.due_date):'—'}{isOverdue&&' ⚠'}</td>
+                    <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:u.status==='fulfilled'?'rgba(141,198,63,0.1)':isOverdue?'rgba(220,80,80,0.1)':'rgba(234,179,8,0.1)',color:u.status==='fulfilled'?'#8DC63F':isOverdue?'#E05252':'#EAB308',fontWeight:600}}>{u.status}</span></td>
+                    <td style={C.td}><div style={{display:'flex',gap:4}}>{u.status==='pending'&&<button style={{...C.btn('p'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{await fulfillUndertaking(u.id);const{undertakings:ut}=await fetchUndertakings({});setUndertakings(ut);showAlert('✓ Undertaking fulfilled.');}}>✓ Fulfil</button>}<button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{if(!confirm('Delete?'))return;await deleteUndertaking(u.id);const{undertakings:ut}=await fetchUndertakings({});setUndertakings(ut);}}>Del</button></div></td>
+                  </tr>);
+                })}
+              </tbody></table></div>}
+            </>);
+          })()}
+        </div>)}
+
+        {/* ── COMMUNICATIONS TAB ───────────────────────────── */}
+        {tab==='communications'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Client Communications</div><div style={{fontSize:11,color:'#444'}}>Log of all client interactions firm-wide</div></div>
+            <button style={C.btn('p')} onClick={()=>{setCommForm({client_id:clients[0]?.id||'',matter_id:'',comm_type:'call',direction:'outbound',subject:'',body:'',comm_date:new Date().toLocaleDateString('en-CA')});setShowCommForm(true);}}>+ Log Communication</button>
+          </div>
+          {!communications.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>💬</div><div>No communications logged yet</div></div>):
+          <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Type','Direction','Client','Matter','Subject','Logged By','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+            {communications.map(c=>{
+              const cl=clients.find(x=>x.id===c.client_id);
+              const typeColors={call:'#4A90D9',email:'#8DC63F',meeting:'#A78BFA',letter:'#EAB308',note:'#888',whatsapp:'#25D366'};
+              return(<tr key={c.id}>
+                <td style={{...C.td,fontSize:10,color:'#666'}}>{fmtDate(c.comm_date)}</td>
+                <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:'rgba(74,144,217,0.08)',color:typeColors[c.comm_type]||'#888',fontWeight:600,textTransform:'capitalize'}}>{c.comm_type}</span></td>
+                <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:'rgba(85,85,85,0.15)',color:c.direction==='inbound'?'#8DC63F':'#4A90D9',fontWeight:600}}>{c.direction}</span></td>
+                <td style={{...C.td,color:'#C8C8C8'}}>{cl?.full_name||'—'}</td>
+                <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{c.matter_id||'—'}</td>
+                <td style={{...C.td,color:'#888',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.subject||c.body.substring(0,40)}</td>
+                <td style={{...C.td,fontSize:10,color:'#555'}}>{c.profiles?.full_name||'—'}</td>
+                <td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{if(!confirm('Delete?'))return;await deleteClientCommunication(c.id);const{communications:co}=await fetchClientCommunications({});setCommunications(co);}}>Del</button></td>
+              </tr>);
+            })}
+          </tbody></table></div>}
+        </div>)}
+
+        {/* ── INTEREST TAB ─────────────────────────────────── */}
+        {tab==='interest'&&(<div style={C.main}>
+          {(()=>{
+            const now=new Date();
+            const age=inv=>Math.floor((now-new Date(inv.created_at||0))/86400000);
+            const paid=invId=>invoicePayments.filter(p=>p.invoice_id===invId).reduce((s,p)=>s+Number(p.amount),0);
+            const outstanding=inv=>Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid(inv.id));
+            const RATE=10.5;
+            const overdueInvs=invoices.filter(inv=>age(inv)>30&&outstanding(inv)>0&&!inv.written_off);
+            const totalInterest=overdueInvs.reduce((s,inv)=>s+parseFloat((outstanding(inv)*(RATE/100)*(age(inv)/365)).toFixed(2)),0);
+            return(<>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+                <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Interest on Overdue Accounts</div><div style={{fontSize:11,color:'#444'}}>Legal rate: {RATE}% per annum · Invoices overdue &gt;30 days</div></div>
+                <button style={C.btn('p')} onClick={()=>overdueInvs.forEach(inv=>handleAddInterest(inv))}>Add Interest to All</button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+                {[{l:'Overdue invoices',v:overdueInvs.length,s:'>30 days',w:overdueInvs.length>0},{l:'Total outstanding',v:fmtR(overdueInvs.reduce((s,i)=>s+outstanding(i),0)),s:'excl. interest',w:true},{l:'Total interest due',v:fmtR(totalInterest),s:`@ ${RATE}% p.a.`,w:true}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w&&overdueInvs.length>0)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&overdueInvs.length>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
+              </div>
+              {!overdueInvs.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>✅</div><div>No overdue invoices</div></div>):
+              <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Overdue Invoice Detail</div>
+                <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Age','Outstanding','Interest ({RATE}% p.a.)','Action'].map(h=><th key={h} style={C.th}>{h.replace('{RATE}',RATE)}</th>)}</tr></thead><tbody>
+                  {overdueInvs.sort((a,b)=>age(b)-age(a)).map(inv=>{
+                    const a=age(inv),o=outstanding(inv),interest=parseFloat((o*(RATE/100)*(a/365)).toFixed(2));
+                    return(<tr key={inv.id}>
+                      <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
+                      <td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td>
+                      <td style={{...C.td,fontFamily:'monospace',color:'#E05252',fontWeight:700}}>{a} days</td>
+                      <td style={{...C.td,fontFamily:'monospace',color:'#EAB308',fontWeight:700}}>{fmtR(o)}</td>
+                      <td style={{...C.td,fontFamily:'monospace',color:'#E05252',fontWeight:700}}>{fmtR(interest)}</td>
+                      <td style={C.td}><button style={{...C.btn('warn'),fontSize:10,padding:'3px 10px'}} onClick={()=>handleAddInterest(inv)}>Add Interest</button></td>
+                    </tr>);
+                  })}
+                </tbody></table>
+              </div>}
+            </>);
+          })()}
+        </div>)}
+
+        {/* ── AUDIT LOG TAB ────────────────────────────────── */}
+        {tab==='audit'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Audit Trail</div><div style={{fontSize:11,color:'#444'}}>Full log of all actions taken in the system</div></div>
+            <button style={C.btn()} onClick={()=>{ setAuditLoading(true); fetchAuditLog({}).then(r=>{setAuditLogs(r.logs||[]);setAuditLoading(false);}); }}>↻ Refresh</button>
+          </div>
+          {auditLoading?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}>Loading…</div>):
+          !auditLogs.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📋</div><div>No audit entries yet</div><div style={{fontSize:11,color:'#333',marginTop:6}}>Actions like invoicing, trust transactions and credit notes will appear here</div></div>):
+          <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date & Time','User','Action','Entity','Details'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+            {auditLogs.map(l=>(<tr key={l.id}>
+              <td style={{...C.td,fontSize:10,color:'#666',whiteSpace:'nowrap'}}>{new Date(l.created_at).toLocaleString('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+              <td style={{...C.td,color:'#C8C8C8'}}>{l.profiles?.full_name||'System'}</td>
+              <td style={C.td}><span style={{fontSize:10,padding:'1px 8px',borderRadius:20,background:'rgba(141,198,63,0.08)',color:'#8DC63F',fontWeight:600}}>{l.action?.replace(/_/g,' ')}</span></td>
+              <td style={{...C.td,fontSize:10,color:'#A78BFA',fontFamily:'monospace'}}>{l.entity_type} {l.entity_id?`· ${l.entity_id.substring(0,12)}…`:''}</td>
+              <td style={{...C.td,fontSize:10,color:'#555'}}>{l.details?JSON.stringify(l.details).substring(0,60):'—'}</td>
+            </tr>))}
+          </tbody></table></div>}
+        </div>)}
+
+        {/* ── MODALS: Undertaking form ─────────────────────── */}
+        {showUTForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowUTForm(false)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:500}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>New Undertaking</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Matter *</label><select className="mb-inp" value={utForm.matter_id} onChange={e=>setUtForm(f=>({...f,matter_id:e.target.value}))}><option value="">— Select —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.client}</option>)}</select></div>
+                <div><label style={lbl}>Direction *</label><select className="mb-inp" value={utForm.direction} onChange={e=>setUtForm(f=>({...f,direction:e.target.value}))}><option value="given">Given (by us)</option><option value="received">Received (from other party)</option></select></div>
+              </div>
+              <div><label style={lbl}>Description *</label><textarea className="mb-inp" style={{minHeight:60,resize:'vertical'}} placeholder="Describe the undertaking..." value={utForm.description} onChange={e=>setUtForm(f=>({...f,description:e.target.value}))}/></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Given To / Received From</label><input className="mb-inp" placeholder="Name / firm" value={utForm.given_to} onChange={e=>setUtForm(f=>({...f,given_to:e.target.value}))}/></div>
+                <div><label style={lbl}>Due Date</label><input className="mb-inp" type="date" value={utForm.due_date} onChange={e=>setUtForm(f=>({...f,due_date:e.target.value}))}/></div>
+              </div>
+              <div><label style={lbl}>Notes</label><input className="mb-inp" placeholder="Additional notes..." value={utForm.notes} onChange={e=>setUtForm(f=>({...f,notes:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowUTForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!utForm.description.trim()||!utForm.matter_id} onClick={handleSaveUndertaking}>Save Undertaking</button></div>
+          </div>
+        </div>)}
+
+        {/* ── MODAL: Communication form ─────────────────────── */}
+        {showCommForm&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowCommForm(false)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:520}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>Log Communication</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Client</label><select className="mb-inp" value={commForm.client_id} onChange={e=>setCommForm(f=>({...f,client_id:e.target.value}))}><option value="">— Select client —</option>{clients.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}</select></div>
+                <div><label style={lbl}>Matter</label><select className="mb-inp" value={commForm.matter_id} onChange={e=>setCommForm(f=>({...f,matter_id:e.target.value}))}><option value="">— Select matter —</option>{matters.filter(m=>!commForm.client_id||clients.find(c=>c.id===commForm.client_id)?.full_name===m.client).map(m=><option key={m.id} value={m.id}>{m.id} · {m.name}</option>)}</select></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Type *</label><select className="mb-inp" value={commForm.comm_type} onChange={e=>setCommForm(f=>({...f,comm_type:e.target.value}))}>{['call','email','meeting','letter','note','whatsapp'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
+                <div><label style={lbl}>Direction</label><select className="mb-inp" value={commForm.direction} onChange={e=>setCommForm(f=>({...f,direction:e.target.value}))}><option value="outbound">Outbound</option><option value="inbound">Inbound</option></select></div>
+                <div><label style={lbl}>Date</label><input className="mb-inp" type="date" value={commForm.comm_date} onChange={e=>setCommForm(f=>({...f,comm_date:e.target.value}))}/></div>
+              </div>
+              <div><label style={lbl}>Subject</label><input className="mb-inp" placeholder="Brief subject..." value={commForm.subject} onChange={e=>setCommForm(f=>({...f,subject:e.target.value}))}/></div>
+              <div><label style={lbl}>Notes / Body *</label><textarea className="mb-inp" style={{minHeight:80,resize:'vertical'}} placeholder="What was discussed / communicated..." value={commForm.body} onChange={e=>setCommForm(f=>({...f,body:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowCommForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!commForm.body.trim()} onClick={handleSaveComm}>Log Communication</button></div>
+          </div>
+        </div>)}
+
+        {/* ── MODAL: Matter closure ───────────────────────────── */}
+        {closingMatter&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setClosingMatter(null)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:440}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Close Matter — {closingMatter.id}</div>
+            <div style={{fontSize:11,color:'#555',marginBottom:16}}>{closingMatter.name} · {closingMatter.client}</div>
+            <div><label style={lbl}>Closure Notes *</label><textarea className="mb-inp" style={{minHeight:80,resize:'vertical'}} placeholder="Reason for closure, final actions taken..." value={closureForm.closure_notes} onChange={e=>setClosureForm(f=>({...f,closure_notes:e.target.value}))}/></div>
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setClosingMatter(null)}>Cancel</button><button style={{...C.btn('r')}} disabled={!closureForm.closure_notes.trim()} onClick={()=>handleCloseMatter(closingMatter)}>Close Matter</button></div>
           </div>
         </div>)}
 

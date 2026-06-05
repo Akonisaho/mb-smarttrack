@@ -512,6 +512,112 @@ export async function undoWriteOff(invoiceId) {
   return { error };
 }
 
+// ── Matter (update) ───────────────────────────────────────────────────
+export async function updateMatter(id, updates) {
+  const { data, error } = await supabase.from('matters').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select();
+  if (error) console.error('updateMatter:', error.message);
+  return { data: data?.[0], error };
+}
+
+// ── Undertakings ──────────────────────────────────────────────────────
+export async function fetchUndertakings({ matterId, userId, status } = {}) {
+  let q = supabase.from('undertakings').select('*, profiles(full_name)').order('due_date', { ascending: true, nullsLast: true });
+  if (matterId) q = q.eq('matter_id', matterId);
+  if (userId)   q = q.eq('user_id', userId);
+  if (status)   q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) console.error('fetchUndertakings:', error.message);
+  return { undertakings: data || [] };
+}
+
+export async function saveUndertaking(u, userId) {
+  const payload = { ...u, updated_at: new Date().toISOString() };
+  const { data, error } = u.id
+    ? await supabase.from('undertakings').update(payload).eq('id', u.id).select()
+    : await supabase.from('undertakings').insert([{ ...payload, user_id: userId }]).select();
+  if (error) console.error('saveUndertaking:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function fulfillUndertaking(id) {
+  const { error } = await supabase.from('undertakings').update({ status: 'fulfilled', fulfilled_at: new Date().toISOString() }).eq('id', id);
+  if (error) console.error('fulfillUndertaking:', error.message);
+  return { error };
+}
+
+export async function deleteUndertaking(id) {
+  const { error } = await supabase.from('undertakings').delete().eq('id', id);
+  if (error) console.error('deleteUndertaking:', error.message);
+  return { error };
+}
+
+// ── Client Communications ─────────────────────────────────────────────
+export async function fetchClientCommunications({ clientId, matterId, userId } = {}) {
+  let q = supabase.from('client_communications').select('*, profiles(full_name)').order('comm_date', { ascending: false }).order('created_at', { ascending: false });
+  if (clientId) q = q.eq('client_id', clientId);
+  if (matterId) q = q.eq('matter_id', matterId);
+  if (userId)   q = q.eq('user_id', userId);
+  const { data, error } = await q;
+  if (error) console.error('fetchClientCommunications:', error.message);
+  return { communications: data || [] };
+}
+
+export async function saveClientCommunication(comm, userId) {
+  const { data, error } = await supabase.from('client_communications').insert([{ ...comm, user_id: userId }]).select();
+  if (error) console.error('saveClientCommunication:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteClientCommunication(id) {
+  const { error } = await supabase.from('client_communications').delete().eq('id', id);
+  if (error) console.error('deleteClientCommunication:', error.message);
+  return { error };
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────
+export async function logAudit(action, entityType, entityId, details, userId) {
+  const { error } = await supabase.from('audit_log').insert([{
+    user_id: userId, action, entity_type: entityType, entity_id: entityId, details
+  }]);
+  if (error) console.error('logAudit:', error.message);
+}
+
+export async function fetchAuditLog({ limit = 200, entityType, userId: filterUser } = {}) {
+  let q = supabase.from('audit_log')
+    .select('*, profiles(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (entityType) q = q.eq('entity_type', entityType);
+  if (filterUser) q = q.eq('user_id', filterUser);
+  const { data, error } = await q;
+  if (error) console.error('fetchAuditLog:', error.message);
+  return { logs: data || [] };
+}
+
+// ── Interest Charges ──────────────────────────────────────────────────
+export async function saveInterestCharge({ invoiceId, amount, ratePercent, daysOverdue }, userId) {
+  const { data, error } = await supabase.from('interest_charges').insert([{
+    invoice_id: invoiceId, amount, rate_percent: ratePercent, days_overdue: daysOverdue, user_id: userId
+  }]).select();
+  if (error) console.error('saveInterestCharge:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function fetchInterestCharges(invoiceId) {
+  const { data, error } = await supabase.from('interest_charges').select('*').eq('invoice_id', invoiceId).order('calculated_at', { ascending: false });
+  if (error) console.error('fetchInterestCharges:', error.message);
+  return { charges: data || [] };
+}
+
+// ── Conflict of Interest Check ────────────────────────────────────────
+export async function checkConflict(clientName) {
+  if (!clientName) return { conflicts: [] };
+  const q = clientName.toLowerCase().trim();
+  const { data } = await supabase.from('matters').select('id,client,name,user_id').limit(500);
+  const conflicts = (data || []).filter(m => m.client && m.client.toLowerCase().includes(q) && m.client.toLowerCase() !== q);
+  return { conflicts };
+}
+
 // ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
