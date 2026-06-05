@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles, fetchInvoices } from '../lib/supabase';
-import Sidebar from '../components/Sidebar';
+import NavBar from '../components/NavBar';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
@@ -194,9 +194,7 @@ export default function Bookkeeper() {
   }
 
   const C = {
-    page: {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0',display:'flex'},
-    content: {flex:1,minWidth:0,display:'flex',flexDirection:'column'},
-    hdr: {background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:48,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
+    page: {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0'},
     main: {maxWidth:1300,margin:'0 auto',padding:'20px 24px'},
     card: {background:'#111',border:'1px solid #1A1A1A',borderRadius:8,padding:16,marginBottom:14},
     stat: (acc,warn)=>({background:acc?'rgba(141,198,63,0.05)':warn?'rgba(234,179,8,0.05)':'#111',border:`1px solid ${acc?'rgba(141,198,63,0.25)':warn?'rgba(234,179,8,0.25)':'#1A1A1A'}`,borderRadius:8,padding:14}),
@@ -240,19 +238,15 @@ export default function Bookkeeper() {
       <Head><title>MB SmartTrack — Bookkeeper</title></Head>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}table tr:hover td{background:rgba(141,198,63,0.025)}select option{background:#1A1A1A;color:#F0F0F0}input[type=date],input[type=month]{color-scheme:dark}button:hover{opacity:.85}`}</style>
       <div style={C.page}>
-        <Sidebar
+        <NavBar
           role="bookkeeper"
           tab={tab}
           setTab={setTab}
           profile={profile}
+          clock={clock}
           onSignOut={async()=>{await signOut();router.replace('/login');}}
           pendingCount={pendingPayments.length}
         />
-        <div style={C.content}>
-        <div style={C.hdr}>
-          <div style={{fontSize:12,color:'#555',fontWeight:500,paddingLeft:48}}>Bookkeeper — {profile?.full_name}</div>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}><div style={C.pill}><div style={C.dot}/>{clock}</div></div>
-        </div>
 
         {trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'14px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>{trustAlert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setTrustAlert({msg:'',type:''})}>✕</button></div>)}
         {pendingPayments.length>0&&tab!=='trust'&&(<div style={{background:'rgba(234,179,8,0.1)',border:'1px solid rgba(234,179,8,0.3)',padding:'10px 24px',fontSize:12,color:'#EAB308',display:'flex',justifyContent:'space-between',alignItems:'center'}}><span>⏳ {pendingPayments.length} payment{pendingPayments.length>1?'s':''} pending approval — {fmtR(pendingPayments.reduce((s,t)=>s+Number(t.amount),0))}</span><button style={C.btn('warn')} onClick={()=>setTab('trust')}>Review →</button></div>)}
@@ -350,7 +344,6 @@ export default function Bookkeeper() {
           <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
           <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!invoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}{invoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}{invoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{invoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(invoices.reduce((s,i)=>s+(i.total_units||0)*(i.rate||150),0)*1.15).toFixed(2)}</td></tr>)}</tbody></table></div>
         </div>)}
-        </div>{/* end C.content */}
       </div>
     </>
   );

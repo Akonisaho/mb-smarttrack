@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchCalendarEvents, saveCalendarEvent, deleteCalendarEvent } from '../lib/supabase';
 import { useFirmSettings } from '../lib/useFirmSettings';
-import Sidebar from '../components/Sidebar';
+import NavBar from '../components/NavBar';
 
 const EV_COLORS = { meeting:'#4A90D9', court:'#E05252', deadline:'#EAB308', call:'#A78BFA', other:'#8DC63F' };
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d||'';} }
@@ -90,9 +90,7 @@ export default function Receptionist() {
   const filteredClients = clients.filter(c => !search || c.full_name?.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
 
   const C = {
-    page:  { background:'#0A0A0A', minHeight:'100vh', fontFamily:"'DM Sans',system-ui,sans-serif", color:'#F0F0F0', display:'flex' },
-    content: { flex:1, minWidth:0, display:'flex', flexDirection:'column' },
-    hdr:   { background:'#0F0F0F', borderBottom:'1px solid #1A1A1A', padding:'0 24px', height:48, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100 },
+    page:  { background:'#0A0A0A', minHeight:'100vh', fontFamily:"'DM Sans',system-ui,sans-serif", color:'#F0F0F0' },
     main:  { maxWidth:1200, margin:'0 auto', padding:'20px 24px' },
     card:  { background:'#111', border:'1px solid #1A1A1A', borderRadius:8, padding:16, marginBottom:14 },
     stat:  { background:'#111', border:'1px solid #1A1A1A', borderRadius:8, padding:14 },
@@ -113,18 +111,14 @@ export default function Receptionist() {
     <Head><title>{firm.firm_name} — Reception</title></Head>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}select option{background:#1A1A1A;color:#F0F0F0}input[type=date],input[type=time]{color-scheme:dark}button:hover{opacity:.85}textarea{resize:vertical}`}</style>
     <div style={C.page}>
-      <Sidebar
+      <NavBar
         role="receptionist"
         tab={tab}
         setTab={setTab}
         profile={profile}
+        clock={clock}
         onSignOut={async()=>{await signOut();router.replace('/login');}}
       />
-      <div style={C.content}>
-      <div style={C.hdr}>
-        <div style={{fontSize:12,color:'#555',fontWeight:500,paddingLeft:48}}>Reception — {profile?.full_name}</div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}><div style={C.pill}><div style={C.dot}/>{clock}</div></div>
-      </div>
 
       {alert.msg&&<div style={{background:alert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${alert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'12px 24px',fontSize:12,color:alert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{alert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setAlert({msg:'',type:''})}>✕</button></div>}
 
@@ -276,7 +270,6 @@ export default function Receptionist() {
         </div>
       </div>)}
 
-      </div>{/* end C.content */}
     </div>
   </>);
 }

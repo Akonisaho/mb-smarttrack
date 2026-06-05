@@ -107,7 +107,7 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
       display:'flex', alignItems:'center', gap:8, flexShrink:0, marginRight:8,
     },
     nav: {
-      display:'flex', alignItems:'center', gap:2, flex:1, flexWrap:'nowrap', overflowX:'auto',
+      display:'flex', alignItems:'center', gap:2, flex:1, flexWrap:'nowrap',
     },
     item: (active) => ({
       background:'transparent',
@@ -186,10 +186,7 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
     <div style={S.hdr} ref={ref}>
       {/* LOGO */}
       <div style={S.logo}>
-        {firm.logo_url
-          ? <img src={firm.logo_url} alt="" style={{width:30,height:30,objectFit:'contain',borderRadius:5}}/>
-          : <div style={{width:30,height:30,background:'#8DC63F',borderRadius:5,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:11,color:'#0A0A0A'}}>MB</div>
-        }
+        {firm.logo_url && <img src={firm.logo_url} alt="" style={{width:30,height:30,objectFit:'contain',borderRadius:5}}/>}
         <div style={{lineHeight:1.2}}>
           <div style={{fontSize:12,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em'}}>MB SmartTrack</div>
           <div style={{fontSize:9,color:'#333',textTransform:'uppercase',letterSpacing:'0.08em'}}>{profile?.full_name}</div>
