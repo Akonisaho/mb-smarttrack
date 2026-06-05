@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice } from '../lib/supabase';
-import Sidebar from '../components/Sidebar';
+import NavBar from '../components/NavBar';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
@@ -273,10 +273,8 @@ export default function Manager() {
   const lbl={fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'};
 
   const C={
-    page:  {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0',display:'flex'},
-    hdr:   {background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:48,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
-    content: {flex:1,minWidth:0,display:'flex',flexDirection:'column'},
-    main:  {maxWidth:1300,margin:'0 auto',padding:'20px 24px',width:'100%'},
+    page:  {background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0'},
+    main:  {maxWidth:1300,margin:'0 auto',padding:'20px 24px'},
     card:  {background:'#111',border:'1px solid #1A1A1A',borderRadius:8,padding:16,marginBottom:14},
     stat:  (acc,warn)=>({background:acc?'rgba(141,198,63,0.05)':warn?'rgba(234,179,8,0.05)':'#111',border:`1px solid ${acc?'rgba(141,198,63,0.25)':warn?'rgba(234,179,8,0.25)':'#1A1A1A'}`,borderRadius:8,padding:14}),
     sel:   {background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'5px 10px',borderRadius:6,fontSize:12,fontFamily:'inherit'},
@@ -295,19 +293,18 @@ export default function Manager() {
       <Head><title>MB SmartTrack — Manager</title></Head>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}table tr:hover td{background:rgba(141,198,63,0.025)}select option{background:#1A1A1A;color:#F0F0F0}input[type=date]{color-scheme:dark}button:hover{opacity:.85}.mb-inp{background:#1A1A1A;border:1px solid #252525;color:#F0F0F0;padding:10px 14px;border-radius:7px;font-size:13px;font-family:'DM Sans',system-ui,sans-serif;width:100%;display:block;}.mb-inp:focus{outline:1px solid rgba(141,198,63,0.5);border-color:rgba(141,198,63,0.4);}.mb-inp option{background:#1A1A1A;color:#F0F0F0;}`}</style>
       <div style={C.page}>
-        <Sidebar
+        <NavBar
           role={isBranchManager?'branch_manager':'manager'}
           tab={tab}
           setTab={setTab}
           profile={profile}
+          clock={clock}
           onSignOut={async()=>{await signOut();router.replace('/login');}}
           pendingCount={pendingPayments.length}
           ficaCount={(()=>{const fm=Object.fromEntries(ficaRecords.map(r=>[r.client_id,r]));return clients.filter(c=>{const r=fm[c.id];return!r||r.fica_status==='pending'||r.fica_status==='expired';}).length;})()}
         />
-        <div style={C.content}>
 
-        <div style={C.hdr}><div style={{fontSize:12,color:'#555',fontWeight:500}}>Manager Dashboard</div><div style={{display:'flex',gap:8,alignItems:'center'}}><div style={C.pill}><div style={C.dot}/>{clock}</div></div></div>
-        {trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'14px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
+{trustAlert.msg&&(<div style={{background:trustAlert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${trustAlert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'14px 24px',fontSize:12,color:trustAlert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
   <span style={{flex:1}}>{trustAlert.msg}</span>
   {trustAlert.type==='success'&&trustAlert.msg.includes('Temporary password:')&&(
     <button style={{background:'rgba(141,198,63,0.2)',border:'1px solid rgba(141,198,63,0.4)',color:'#8DC63F',padding:'4px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>{ const pwd=trustAlert.msg.match(/Temporary password: ([^\s—]+)/)?.[1]; if(pwd){navigator.clipboard.writeText(pwd);} }}>📋 Copy Password</button>
@@ -780,7 +777,6 @@ export default function Manager() {
           </div>
         </div>)}
 
-        </div>{/* end C.content */}
       </div>
     </>
   );
