@@ -42,7 +42,11 @@ export default function Manager() {
   const [branches,setBranches]           = useState([]);
   const [clock,setClock]                 = useState('');
   const [histYear,setHistYear]           = useState(new Date().getFullYear());
-  const [histData,setHistData]           = useState([]);
+  const [histLoading,setHistLoading]     = useState(false);
+  const [histData,setHistData]           = useState(()=>{
+    const y=new Date().getFullYear();
+    return Array.from({length:12},(_,i)=>({month:`${y}-${String(i+1).padStart(2,'0')}`,sessions:0,total_seconds:0,billable_seconds:0,billable_units:0}));
+  });
   const [selMonth,setSelMonth]           = useState(null);
   const [monthActs,setMonthActs]         = useState([]);
   const [trustTxns,setTrustTxns]         = useState([]);
@@ -135,6 +139,7 @@ export default function Manager() {
   useEffect(()=>{
     if(tab!=='history') return;
     const fetchHist=async()=>{
+      setHistLoading(true);
       const {data}=await supabase.from('activities')
         .select('user_id,date,duration_seconds,is_billable,billing_units')
         .neq('agent_id','demo')
@@ -153,6 +158,7 @@ export default function Manager() {
         months[key].billable_units+=a.is_billable?(a.billing_units||0):0;
       });
       setHistData(Object.values(months));
+      setHistLoading(false);
     };
     fetchHist();
   },[tab,histYear]);
@@ -392,12 +398,13 @@ export default function Manager() {
 
         {tab==='history'&&(<div style={C.main}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
-    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>Click a month to see attorney billing details</div></div>
+    <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm History</div><div style={{fontSize:11,color:'#444'}}>{histLoading?'Loading…':'Click a month to see attorney billing details'}</div></div>
     <div style={{display:'flex',gap:8,alignItems:'center'}}>
       <select style={C.sel} value={histYear} onChange={e=>{setHistYear(Number(e.target.value));setSelMonth(null);setMonthActs([]);}}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select>
       <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
     </div>
   </div>
+  {!histLoading&&histData.every(m=>m.sessions===0)&&(<div style={{...C.card,textAlign:'center',padding:'30px 20px',marginBottom:14}}><div style={{fontSize:22,marginBottom:8}}>📊</div><div style={{fontSize:13,color:'#555',marginBottom:4}}>No activity data for {histYear}</div><div style={{fontSize:11,color:'#333'}}>Activities tracked by the Electron agent will appear here once attorneys start recording time.</div></div>)}
   {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
   <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
     {histData.map(m=>{
@@ -754,6 +761,31 @@ export default function Manager() {
         {tab==='invoices'&&(<div style={C.main}>
           <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:14}}>All Invoices — Motsoeneng Bill</div>
           <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice ID','Client','Matter ID','Attorney','Period','Units','Rate','Excl. VAT','Incl. VAT 15%'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!filtInvoices.length&&<tr><td colSpan={9} style={{padding:'30px',textAlign:'center',color:'#333'}}>No invoices yet</td></tr>}{filtInvoices.map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id}</td><td style={{...C.td,color:'#777'}}>{inv.attorney}</td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:600}}>{inv.total_units}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>R{inv.rate}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)).toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}{filtInvoices.length>0&&(<tr style={{background:'rgba(141,198,63,0.05)'}}><td colSpan={7} style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>TOTAL</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{billedRevenue.toLocaleString()}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{(billedRevenue*1.15).toFixed(2)}</td></tr>)}</tbody></table></div>
+        </div>)}
+
+        {tab==='settings'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Settings</div><div style={{fontSize:11,color:'#444'}}>Configure your firm details, billing rates and banking information</div></div>
+            <button style={C.btn()} onClick={()=>router.push('/settings')}>Open full settings →</button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div style={C.card}>
+              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Firm Information</div>
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {[['Firm Name','firm_name'],['VAT Number','vat_number'],['Phone','phone'],['Email','email'],['Website','website'],['Address','address']].map(([label,key])=>(
+                  <div key={key}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:3}}>{label}</div><div style={{fontSize:12,color:'#C8C8C8',background:'#0D0D0D',padding:'8px 10px',borderRadius:5,border:'1px solid #1A1A1A'}}>{profile?.[key]||<span style={{color:'#333'}}>Not set — open full settings to configure</span>}</div></div>
+                ))}
+              </div>
+            </div>
+            <div style={C.card}>
+              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Banking Details</div>
+              <div style={{fontSize:11,color:'#555',marginBottom:12}}>Displayed on all invoices sent to clients</div>
+              {[['Bank Name','bank_name'],['Account Number','bank_account'],['Branch Code','bank_branch'],['Default Rate (R/unit)','default_rate']].map(([label,key])=>(
+                <div key={key} style={{marginBottom:10}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:3}}>{label}</div><div style={{fontSize:12,color:'#C8C8C8',background:'#0D0D0D',padding:'8px 10px',borderRadius:5,border:'1px solid #1A1A1A'}}>{profile?.[key]||<span style={{color:'#333'}}>Not set</span>}</div></div>
+              ))}
+              <button style={{...C.btn('p'),marginTop:8,width:'100%'}} onClick={()=>router.push('/settings')}>Edit all settings →</button>
+            </div>
+          </div>
         </div>)}
 
         {tab==='staff'&&(<div style={C.main}>

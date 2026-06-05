@@ -28,7 +28,7 @@ const NAV = {
     ]},
     { type:'group', label:'Admin', items:[
       { label:'Staff', id:'staff' },
-      { label:'Settings', href:'/settings' },
+      { label:'Settings', id:'settings' },
     ]},
   ],
   attorney: [
