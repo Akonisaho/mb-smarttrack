@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice, fetchCreditNotes, saveCreditNote, writeOffInvoice, undoWriteOff } from '../lib/supabase';
 import NavBar from '../components/NavBar';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
@@ -69,6 +69,12 @@ export default function Manager() {
   const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
   const rate = 150;
   const [overviewPeriod, setOverviewPeriod] = useState('day');
+  const [creditNotes,setCreditNotes]       = useState([]);
+  const [showCNForm,setShowCNForm]         = useState(false);
+  const [cnInvoice,setCnInvoice]           = useState(null);
+  const [cnForm,setCnForm]                 = useState({amount:'',reason:''});
+  const [savingCN,setSavingCN]             = useState(false);
+  const [emailingInv,setEmailingInv]       = useState(null);
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -203,6 +209,8 @@ export default function Manager() {
   }
 
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
+  async function handleSaveCreditNote(){ if(!cnForm.amount||!cnForm.reason.trim()||!cnInvoice) return; setSavingCN(true); const{error}=await saveCreditNote({invoiceId:cnInvoice.id,client:cnInvoice.client,matterId:cnInvoice.matter_id,amount:cnForm.amount,reason:cnForm.reason},profile?.id); setSavingCN(false); if(error){showAlert('Error: '+error.message,'error');return;} const{creditNotes:cn}=await fetchCreditNotes(null); setCreditNotes(cn); setShowCNForm(false);setCnInvoice(null);setCnForm({amount:'',reason:''});showAlert('✓ Credit note issued.'); }
+  async function handleEmailInvoice(inv,customEmail){ setEmailingInv(inv.id); const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})}); const data=await res.json(); setEmailingInv(null); if(!res.ok){showAlert('Could not send: '+(data.error||'Unknown error'),'error');return;} showAlert(data.warning||`✓ Invoice emailed to ${data.sentTo}`); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
@@ -513,10 +521,10 @@ export default function Manager() {
         </tbody></table>}
       </div>
       <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Invoice Detail</div>
-        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Matter','Date','Age','Invoice Amt','Paid','Outstanding'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
-          {!unpaidInvs.length&&<tr><td colSpan={8} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No outstanding invoices</td></tr>}
-          {unpaidInvs.sort((a,b)=>age(b)-age(a)).map(inv=>{const a=age(inv),p=paid(inv.id),o=outstanding(inv),amt=(inv.total_units||0)*(inv.rate||150)*1.15;return(<tr key={inv.id}>
-            <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td>
+        <table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Matter','Date','Age','Invoice Amt','Paid','Outstanding','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+          {!unpaidInvs.length&&<tr><td colSpan={9} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No outstanding invoices</td></tr>}
+          {unpaidInvs.sort((a,b)=>age(b)-age(a)).map(inv=>{const a=age(inv),p=paid(inv.id),o=outstanding(inv),amt=(inv.total_units||0)*(inv.rate||150)*1.15;return(<tr key={inv.id} style={{opacity:inv.written_off?0.5:1}}>
+            <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}{inv.written_off&&<span style={{marginLeft:6,fontSize:9,color:'#555',border:'1px solid #252525',borderRadius:20,padding:'1px 6px'}}>W/O</span>}</td>
             <td style={{...C.td,color:'#C8C8C8'}}>{inv.client}</td>
             <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{inv.matter_id||'—'}</td>
             <td style={{...C.td,fontSize:10,color:'#666'}}>{fmtDate(inv.created_at?.substring(0,10))}</td>
@@ -524,6 +532,11 @@ export default function Manager() {
             <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{fmtR(amt)}</td>
             <td style={{...C.td,fontFamily:'monospace',color:p>0?'#8DC63F':'#333'}}>{p>0?fmtR(p):'—'}</td>
             <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#EAB308'}}>{fmtR(o)}</td>
+            <td style={{...C.td}}><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} disabled={emailingInv===inv.id} onClick={()=>{const em=prompt('Send to email:',inv.client_email||'');if(em===null)return;handleEmailInvoice(inv,em);}}>{emailingInv===inv.id?'…':'✉'}</button>
+              <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>{setCnInvoice(inv);setCnForm({amount:'',reason:''});setShowCNForm(true);}}>CN</button>
+              {!inv.written_off?<button style={{...C.btn('warn'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{const r=prompt('Write-off reason:');if(!r)return;await writeOffInvoice(inv.id,r,profile?.id);load();}}>W/O</button>:<button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={async()=>{await undoWriteOff(inv.id);load();}}>Undo</button>}
+            </div></td>
           </tr>);})}
         </tbody></table>
       </div>
@@ -776,6 +789,8 @@ export default function Manager() {
             </div>
           </div>
         </div>)}
+
+        {showCNForm&&cnInvoice&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowCNForm(false)}><div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:420}} onClick={e=>e.stopPropagation()}><div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Issue Credit Note</div><div style={{fontSize:11,color:'#555',marginBottom:16}}>Against invoice <strong style={{color:'#F0F0F0'}}>{cnInvoice.id}</strong> · {cnInvoice.client} · {fmtR((cnInvoice.total_units||0)*(cnInvoice.rate||150)*1.15)} incl. VAT</div><div style={{display:'flex',flexDirection:'column',gap:12}}><div><label style={lbl}>Credit amount (R) *</label><input className="mb-inp" type="number" placeholder="0.00" value={cnForm.amount} onChange={e=>setCnForm(f=>({...f,amount:e.target.value}))}/></div><div><label style={lbl}>Reason *</label><textarea className="mb-inp" style={{minHeight:70,resize:'vertical'}} placeholder="Reason for credit note..." value={cnForm.reason} onChange={e=>setCnForm(f=>({...f,reason:e.target.value}))}/></div></div><div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowCNForm(false)}>Cancel</button><button style={C.btn('p')} disabled={savingCN||!cnForm.amount||!cnForm.reason.trim()} onClick={handleSaveCreditNote}>{savingCN?'Saving…':'Issue Credit Note'}</button></div></div></div>)}
 
       </div>
     </>

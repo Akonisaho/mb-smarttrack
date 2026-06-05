@@ -447,6 +447,71 @@ export async function createPortalAccess(clientId, email, createdBy) {
   return { data: data?.[0], token, error };
 }
 
+// ── Matter Notes ──────────────────────────────────────────────────────
+export async function fetchMatterNotes(matterId) {
+  const { data, error } = await supabase.from('matter_notes')
+    .select('*, profiles(full_name)')
+    .eq('matter_id', matterId)
+    .order('created_at', { ascending: false });
+  if (error) console.error('fetchMatterNotes:', error.message);
+  return { notes: data || [] };
+}
+
+export async function saveMatterNote({ matterId, note, noteType }, userId) {
+  const { data, error } = await supabase.from('matter_notes').insert([{
+    matter_id: matterId, note, note_type: noteType || 'general',
+    user_id: userId, created_at: new Date().toISOString()
+  }]).select('*, profiles(full_name)');
+  if (error) console.error('saveMatterNote:', error.message);
+  return { data: data?.[0], error };
+}
+
+export async function deleteMatterNote(id) {
+  const { error } = await supabase.from('matter_notes').delete().eq('id', id);
+  if (error) console.error('deleteMatterNote:', error.message);
+  return { error };
+}
+
+// ── Credit Notes ──────────────────────────────────────────────────────
+export async function fetchCreditNotes(userId) {
+  let q = supabase.from('credit_notes').select('*').order('created_at', { ascending: false });
+  if (userId) q = q.eq('user_id', userId);
+  const { data, error } = await q;
+  if (error) console.error('fetchCreditNotes:', error.message);
+  return { creditNotes: data || [] };
+}
+
+export async function saveCreditNote({ invoiceId, client, matterId, amount, reason }, userId) {
+  const ts  = Date.now().toString().slice(-6);
+  const id  = `CN-${ts}-${new Date().getFullYear()}`;
+  const { data, error } = await supabase.from('credit_notes').insert([{
+    id, invoice_id: invoiceId, client, matter_id: matterId,
+    amount: parseFloat(amount), reason, user_id: userId,
+    created_at: new Date().toISOString()
+  }]).select();
+  if (error) console.error('saveCreditNote:', error.message);
+  return { data: data?.[0], error };
+}
+
+// ── Write-offs ────────────────────────────────────────────────────────
+export async function writeOffInvoice(invoiceId, reason, userId) {
+  const { error } = await supabase.from('invoices').update({
+    written_off: true, write_off_reason: reason,
+    written_off_at: new Date().toISOString(), written_off_by: userId
+  }).eq('id', invoiceId);
+  if (error) console.error('writeOffInvoice:', error.message);
+  return { error };
+}
+
+export async function undoWriteOff(invoiceId) {
+  const { error } = await supabase.from('invoices').update({
+    written_off: false, write_off_reason: null,
+    written_off_at: null, written_off_by: null
+  }).eq('id', invoiceId);
+  if (error) console.error('undoWriteOff:', error.message);
+  return { error };
+}
+
 // ── Search ────────────────────────────────────────────────────────────
 export async function searchAll(query, userId) {
   if (!query || !userId) return { activities: [], matters: [], invoices: [] };
