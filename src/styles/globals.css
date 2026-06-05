@@ -96,6 +96,28 @@ html, body {
   background: rgba(108, 192, 74, 0.03);
 }
 
+/* ── Mobile responsive ────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Tables: scroll horizontally instead of overflowing */
+  .mb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Reduce content padding */
+  .mb-main { padding: 14px 12px !important; }
+
+  /* Stat grids: 2 columns on mobile */
+  .mb-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Single column on very small screens */
+  .mb-col-1-mobile { grid-template-columns: 1fr !important; }
+
+  /* Prevent text overflow in table cells */
+  td { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Modals full-width on mobile */
+  .mb-modal { padding: 12px !important; }
+  .mb-modal > div { max-width: 100% !important; border-radius: 8px !important; }
+}
+
 /* Stat card hover */
 .stat-card {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
