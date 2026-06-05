@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles, fetchCalendarEvents, saveCalendarEvent, deleteCalendarEvent } from '../lib/supabase';
+import NavBar from '../components/NavBar';
 
 const EV_COLORS = { meeting:'#4A90D9', court:'#E05252', deadline:'#EAB308', call:'#A78BFA', other:'#8DC63F' };
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
@@ -104,7 +105,6 @@ export default function CalendarPage(){
 
   const C={
     page:{background:'#0A0A0A',minHeight:'100vh',fontFamily:"'DM Sans',system-ui,sans-serif",color:'#F0F0F0'},
-    hdr:{background:'#0F0F0F',borderBottom:'1px solid #1A1A1A',padding:'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100},
     main:{maxWidth:1200,margin:'0 auto',padding:'20px 24px'},
     card:{background:'#111',border:'1px solid #1A1A1A',borderRadius:8,padding:16,marginBottom:14},
     btn:(v='s')=>({background:v==='p'?'#8DC63F':v==='r'?'rgba(220,80,80,0.15)':'transparent',border:v==='p'?'none':v==='r'?'1px solid rgba(220,80,80,0.4)':'1px solid #252525',color:v==='p'?'#0A0A0A':v==='r'?'#E05252':'#888',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:v==='p'?700:500}),
@@ -120,18 +120,17 @@ export default function CalendarPage(){
     <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}select option{background:#1A1A1A;color:#F0F0F0}input[type=date],input[type=time]{color-scheme:dark}button:hover{opacity:.85}textarea{resize:vertical;}`}</style>
     <div style={C.page}>
 
-      <div style={C.hdr}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <img src="/logo.png" alt="MB" style={{width:34,height:34,objectFit:'contain',borderRadius:6}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
-          <div style={{display:'none',background:'#8DC63F',borderRadius:6,width:34,height:34,alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:'#0A0A0A'}}>MB</div>
-          <div><div style={{fontSize:13,fontWeight:700,letterSpacing:'-0.02em'}}>SmartTrack — Calendar</div><div style={{fontSize:9,color:'#3A3A3A',textTransform:'uppercase',letterSpacing:'0.1em'}}>Motsoeneng Bill · {profile?.full_name}</div></div>
-        </div>
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+      <NavBar
+        role={isMgr?'manager':profile?.role==='bookkeeper'?'bookkeeper':profile?.role==='receptionist'?'receptionist':'attorney'}
+        tab={null}
+        setTab={()=>{}}
+        profile={profile}
+        onSignOut={async()=>{await signOut();router.replace('/login');}}
+        rightSlot={<>
           <button style={C.btn()} onClick={()=>router.back()}>← Back</button>
           <button style={C.btn('p')} onClick={()=>openAdd()}>+ New Event</button>
-          <button style={C.btn('r')} onClick={async()=>{await signOut();router.replace('/login');}}>Sign out</button>
-        </div>
-      </div>
+        </>}
+      />
 
       {alert.msg&&<div style={{background:alert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${alert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'12px 24px',fontSize:12,color:alert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{alert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setAlert({msg:'',type:''})}>✕</button></div>}
 
