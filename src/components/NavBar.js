@@ -24,15 +24,18 @@ const NAV = {
       { label:'Clients', id:'clients' },
       { label:'Undertakings', id:'undertakings' },
       { label:'Communications', id:'communications' },
+      { label:'Templates', id:'templates' },
       { label:'Calendar', href:'/calendar' },
       { label:'Documents', href:'/documents' },
     ]},
     { type:'group', label:'Analytics', items:[
       { label:'Analytics', id:'analytics' },
       { label:'History', id:'history' },
+      { label:'Performance', id:'firmperformance' },
     ]},
     { type:'group', label:'Admin', items:[
       { label:'Staff', id:'staff' },
+      { label:'Court Roll', id:'courtroll' },
       { label:'Audit Log', id:'audit' },
       { label:'Settings', id:'settings' },
     ]},
@@ -46,6 +49,7 @@ const NAV = {
       { label:'Communications', id:'communications' },
       { label:'Analytics', id:'analytics' },
       { label:'History', id:'history' },
+      { label:'Performance', id:'performance' },
     ]},
     { type:'group', label:'Billing', items:[
       { label:'Invoice', id:'invoices' },

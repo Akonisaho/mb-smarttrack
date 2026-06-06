@@ -765,6 +765,17 @@ const rFormDirty=useRef(false);
     </div>);
   },[trustTab,trustTransactions,trustAccounts,branches,matters,rForm,pForm,tForm,trustAlert,pendingPayments,balanceAlerts,trustBalances,trustSaving,trustLoading,bankLines,matched,reconPeriod,reportType,reportFrom,reportTo,reportBranch,alertMatterId,alertMinBal,selectedTrustMatter,lockedPeriods,invoices]);
 
+  // ── Target gauge calculations ─────────────────────────────────────
+  const currMonth = new Date().toLocaleDateString('en-CA').substring(0,7);
+  const currMonthUnits = allActs.filter(a=>a.is_billable&&a.date?.startsWith(currMonth)).reduce((s,a)=>s+(a.billing_units||0),0);
+  const monthTarget = profile?.monthly_target||0;
+  const today2 = new Date();
+  const daysInMonth = new Date(today2.getFullYear(),today2.getMonth()+1,0).getDate();
+  const daysLeft = daysInMonth - today2.getDate();
+  const monthPct = monthTarget>0 ? Math.min(100,Math.round(currMonthUnits/monthTarget*100)) : null;
+  const gaugeColor = monthPct===null?'#444':monthPct>=100?'#6CC04A':monthPct>=70?'#EAB308':'#E05252';
+  const monthName = today2.toLocaleDateString('en-ZA',{month:'long'});
+
   if(authLoading) return <div style={{background:'#0A0A0A',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',color:'#444',fontSize:13}}>Loading...</div>;
 
   return(<>
@@ -785,6 +796,17 @@ const rFormDirty=useRef(false);
           {!online&&<span style={{fontSize:11,color:'#3A3A3A'}}>Offline</span>}
         </>}
       />
+
+      {/* ── TARGET GAUGE — always visible ─────────────────── */}
+      {monthTarget>0&&(<div style={{background:'#0D0D0D',borderBottom:'1px solid #1A1A1A',padding:'8px 24px',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        <div style={{fontSize:11,color:'#555',whiteSpace:'nowrap'}}>{monthName} target</div>
+        <div style={{flex:1,minWidth:120,height:6,background:'#1A1A1A',borderRadius:3,overflow:'hidden'}}>
+          <div style={{width:`${monthPct||0}%`,height:'100%',background:gaugeColor,borderRadius:3,transition:'width 0.5s'}}/>
+        </div>
+        <div style={{fontSize:12,fontWeight:700,color:gaugeColor,whiteSpace:'nowrap'}}>{currMonthUnits}/{monthTarget} units ({monthPct||0}%)</div>
+        <div style={{fontSize:10,color:'#333',whiteSpace:'nowrap'}}>{daysLeft} days left</div>
+        {monthPct!==null&&monthPct>=100&&<div style={{fontSize:10,color:'#6CC04A',fontWeight:700}}>🎉 Target hit!</div>}
+      </div>)}
 
       {tab==='today'&&(<div style={C.main}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}><div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>{fdate(selDate)}</div><div style={{fontSize:11,color:'#444'}}>{dayActs.length} sessions · {toHm(daySec)} total</div></div><div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}><select style={C.sel} value={selDate} onChange={e=>setSelDate(e.target.value)}><option value={today}>Today</option>{dates.filter(d=>d.date!==today).map(d=><option key={d.date} value={d.date}>{fdate(d.date)} ({d.sessions})</option>)}</select><button style={C.btn('pur')} onClick={()=>setShowCall(true)}>📞 Log a Call</button><button style={C.btn('p')} onClick={()=>setTab('invoices')}>Generate Invoice</button></div></div>
@@ -966,6 +988,90 @@ const rFormDirty=useRef(false);
       {tab==='invoices'&&(<div style={C.main}><div style={{marginBottom:14}}><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Generate Invoice</div><div style={{fontSize:11,color:'#444'}}>Select a matter — pulls only activities assigned to it</div></div><div style={C.card}><div style={{fontSize:11,fontWeight:600,color:'#888',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:12}}>Step 1 — Select Matter</div>{!matters.length?(<div style={{padding:'10px 0',fontSize:12,color:'#555'}}>No matters yet. <button style={{...C.btn('pur'),padding:'4px 12px',fontSize:11,marginLeft:8}} onClick={()=>setTab('matters')}>Go to Matters →</button></div>):(<select style={{...C.inp,maxWidth:500}} value={invMatterId} onChange={e=>{ setInvMatterId(e.target.value); setPreview(null); }}><option value="">— choose a matter —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.name} — {m.client}</option>)}</select>)}{invMatter&&(<div style={{marginTop:10,display:'flex',gap:20,fontSize:11,flexWrap:'wrap'}}><div><span style={{color:'#555'}}>Client: </span><strong style={{color:'#C0C0C0'}}>{invMatter.client}</strong></div><div><span style={{color:'#555'}}>Activities: </span><strong style={{color:'#6CC04A'}}>{allActs.filter(a=>a.matter===invMatterId).length}</strong></div><div><span style={{color:'#555'}}>Trust balance: </span><strong style={{color:'#4A90D9'}}>{fmtR(getMatterBalance(invMatterId))}</strong></div></div>)}</div>{invMatterId&&(<div style={C.card}><div style={{fontSize:11,fontWeight:600,color:'#888',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:12}}>Step 2 — Configure</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:10}}><div><label style={C.lbl}>Attorney</label><div style={{...C.inp,color:'#D0D0D0',display:'flex',alignItems:'center'}}>{invAtty}</div></div><div><label style={C.lbl}>Rate per unit</label><div style={{...C.inp,color:'#6CC04A',display:'flex',alignItems:'center'}}>R{invRate}/unit · set by manager</div></div><div><label style={C.lbl}>Billing date</label><input style={C.inp} type="date" value={selDate} onChange={e=>setSelDate(e.target.value)}/></div></div><div style={{display:'flex',gap:8,marginBottom:14}}>{[['day','Day'],['week','Week'],['month','Month']].map(([v,l])=>(<button key={v} style={{...C.btn(invPeriod===v?'p':'s'),padding:'5px 18px'}} onClick={()=>setInvPeriod(v)}>{l}</button>))}</div><button style={C.btn('p')} onClick={buildPreview}>Preview Invoice</button></div>)}{preview&&(<div><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}><span style={{fontSize:13,fontWeight:600}}>Preview · {preview.bill.length} billable sessions · {preview.tU} units</span><div style={{display:'flex',gap:8}}><button style={C.btn()} onClick={()=>setPreview(null)}>Cancel</button><button style={C.btn('g')} onClick={()=>downloadPDF({...preview,id:'MB-PREVIEW',client:invMatter?.client,matter_id:invMatter?.id,matter_name:invMatter?.name,attorney:invAtty,rate:invRate,period_label:preview.label},preview.filtered)}>⬇ PDF</button><button style={C.btn('p')} onClick={handleSaveInvoice}>Save to Archive</button></div></div><InvoiceDoc inv={{client:invMatter?.client,matter_id:invMatter?.id,matter_name:invMatter?.name,attorney:invAtty,rate:invRate,period_label:preview.label,id:'MB-PREVIEW'}} acts={preview.filtered}/></div>)}</div>)}
 
       {tab==='archive'&&(<div style={C.main}><div style={{display:'flex',justifyContent:'space-between',marginBottom:14,alignItems:'center',flexWrap:'wrap',gap:10}}><div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Invoice Archive</div><div style={{fontSize:11,color:'#444'}}>{invoices.length} saved invoices</div></div><select style={C.sel} value={archFilter} onChange={e=>setArchFilter(e.target.value)}><option value="">All periods</option><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option></select></div>{!invoices.filter(i=>!archFilter||i.period===archFilter).length?(<div style={{...C.card,textAlign:'center',padding:'40px',color:'#333'}}><div style={{fontSize:32,marginBottom:12}}>🗃️</div><div style={{fontSize:14,color:'#444'}}>No invoices saved yet</div></div>):invoices.filter(i=>!archFilter||i.period===archFilter).map(inv=>{ const invActs=allActs.filter(a=>(inv.activity_ids||[]).includes(a.id)); return(<div key={inv.id} style={{...C.card,marginBottom:8,cursor:'pointer'}} onClick={()=>setViewInv(inv)}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}><div style={{flex:1}}><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:12,fontWeight:700,color:'#D0D0D0'}}>{inv.id}</span><span style={{fontSize:9,color:'#6CC04A',border:'1px solid rgba(108,192,74,0.3)',background:'rgba(108,192,74,0.08)',padding:'1px 8px',borderRadius:20}}>Saved</span></div><div style={{fontSize:11,color:'#555'}}>{inv.client} · <span style={{color:'#A78BFA'}}>{inv.matter_id||inv.matter_name}</span></div><div style={{fontSize:10,color:'#333',marginTop:2}}>{inv.period_label} · {inv.total_units} units</div></div><div style={{display:'flex',alignItems:'center',gap:12}}><div style={{textAlign:'right'}}><div style={{fontSize:22,fontWeight:800,color:'#6CC04A'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</div><div style={{fontSize:10,color:'#444',marginTop:2}}>incl. VAT</div></div><button style={{...C.btn('g'),fontSize:11,padding:'5px 12px'}} onClick={e=>{e.stopPropagation();downloadPDF(inv,invActs);}}>⬇ PDF</button><button style={{...C.btn(),fontSize:11,padding:'5px 12px'}} disabled={emailingInv===inv.id} onClick={async e=>{e.stopPropagation();const email=prompt('Send to email address:',inv.client_email||'');if(email===null)return;await handleEmailInvoice(inv,email);}}>{emailingInv===inv.id?'Sending…':'✉ Email'}</button><button style={{...C.btn(),fontSize:11,padding:'5px 12px'}} onClick={e=>{e.stopPropagation();setCnInvoice(inv);setCnForm({amount:'',reason:''});setShowCNForm(true);}}>Credit Note</button>{!inv.written_off?<button style={{...C.btn('warn'),fontSize:11,padding:'5px 12px'}} onClick={async e=>{e.stopPropagation();const r=prompt('Reason for write-off:');if(!r)return;await writeOffInvoice(inv.id,r,userId);load();}}>Write Off</button>:<button style={{...C.btn(),fontSize:11,padding:'5px 12px'}} onClick={async e=>{e.stopPropagation();await undoWriteOff(inv.id);load();}}>Undo W/O</button>}<button style={{...C.btn('r'),fontSize:11,padding:'5px 12px'}} onClick={async e=>{e.stopPropagation();if(!confirm(`Delete ${inv.id}?`)) return;await deleteInvoice(inv.id);load();}}>Delete</button></div></div></div>); })}</div>)}
+
+      {/* ── PERFORMANCE TAB ──────────────────────────────── */}
+      {tab==='performance'&&(<div style={C.main}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+          <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>My Performance</div><div style={{fontSize:11,color:'#444'}}>Your billing history and performance over time</div></div>
+        </div>
+        {(()=>{
+          const years=[...new Set(allActs.map(a=>a.date?.substring(0,4)).filter(Boolean))].sort((a,b)=>b-a);
+          const allYears=years.length?years:[new Date().getFullYear().toString()];
+          return allYears.map(yr=>{
+            const months=Array.from({length:12},(_,i)=>{
+              const key=`${yr}-${String(i+1).padStart(2,'0')}`;
+              const acts=allActs.filter(a=>a.is_billable&&a.date?.startsWith(key));
+              const units=acts.reduce((s,a)=>s+(a.billing_units||0),0);
+              const sec=acts.reduce((s,a)=>s+(a.duration_seconds||0),0);
+              const invAmt=invoices.filter(i=>i.created_at?.startsWith(key)).reduce((s,i)=>s+(i.total_units||0)*(i.rate||150)*1.15,0);
+              const tgt=monthTarget;
+              const pct2=tgt>0?Math.min(100,Math.round(units/tgt*100)):null;
+              const hasFuture=new Date(key+'-01')>new Date();
+              return{key,month:new Date(key+'-01T12:00:00').toLocaleString('en-ZA',{month:'short'}),units,sec,invAmt,pct:pct2,hasFuture};
+            });
+            const yrTotal=months.reduce((s,m)=>s+m.units,0);
+            const yrRev=months.reduce((s,m)=>s+m.invAmt,0);
+            return(<div key={yr} style={{marginBottom:28}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <div style={{fontSize:14,fontWeight:700,color:'#D0D0D0'}}>{yr}</div>
+                <div style={{fontSize:11,color:'#555'}}>{yrTotal} units · R{yrRev.toLocaleString(undefined,{maximumFractionDigits:0})} revenue</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:8}}>
+                {months.map(m=>{
+                  const c=m.pct===null?'#444':m.pct>=100?'#6CC04A':m.pct>=70?'#EAB308':'#E05252';
+                  return(<div key={m.key} style={{background:m.units>0?'#111':'#0D0D0D',border:`1px solid ${m.units>0?'#1A1A1A':'#131313'}`,borderRadius:8,padding:12,opacity:m.hasFuture?0.4:1}}>
+                    <div style={{fontSize:11,fontWeight:600,color:m.units>0?'#D0D0D0':'#333',marginBottom:6}}>{m.month}</div>
+                    {m.units>0?(<>
+                      <div style={{fontSize:18,fontWeight:800,color:'#6CC04A',marginBottom:2}}>{m.units}</div>
+                      <div style={{fontSize:9,color:'#555',marginBottom:6}}>units</div>
+                      {m.pct!==null&&(<div style={{height:4,background:'#1A1A1A',borderRadius:2,marginBottom:4}}><div style={{width:`${m.pct}%`,height:'100%',background:c,borderRadius:2}}/></div>)}
+                      {m.pct!==null&&<div style={{fontSize:9,color:c,fontWeight:700}}>{m.pct}% of target</div>}
+                      <div style={{fontSize:9,color:'#4A90D9',marginTop:4}}>R{m.invAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+                    </>):(<div style={{fontSize:10,color:'#2A2A2A',marginTop:8}}>{m.hasFuture?'Future':'No data'}</div>)}
+                  </div>);
+                })}
+              </div>
+            </div>);
+          });
+        })()}
+        {/* Bi-annual summary */}
+        {(()=>{
+          const yr=new Date().getFullYear();
+          const h1months=Array.from({length:6},(_,i)=>`${yr}-${String(i+1).padStart(2,'0')}`);
+          const h2months=Array.from({length:6},(_,i)=>`${yr}-${String(i+7).padStart(2,'0')}`);
+          const halfSummary=(months,label)=>{
+            const acts=allActs.filter(a=>a.is_billable&&months.some(m=>a.date?.startsWith(m)));
+            const units=acts.reduce((s,a)=>s+(a.billing_units||0),0);
+            const sec=acts.reduce((s,a)=>s+(a.duration_seconds||0),0);
+            const invAmt=invoices.filter(i=>months.some(m=>i.created_at?.startsWith(m))).reduce((s,i)=>s+(i.total_units||0)*(i.rate||150)*1.15,0);
+            const tgt=(monthTarget||0)*6;
+            const pct3=tgt>0?Math.round(units/tgt*100):null;
+            const toHm2=(s)=>{s=Number(s)||0;if(s<=0)return'0m';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}h ${m}m`:`${m}m`;};
+            const util=sec>0?Math.round(acts.reduce((s,a)=>s+(a.duration_seconds||0),0)/allActs.filter(a=>months.some(m=>a.date?.startsWith(m))).reduce((s,a)=>s+(a.duration_seconds||0),1)*100):0;
+            return(<div key={label} style={{...C.card,background:'rgba(108,192,74,0.03)',border:'1px solid rgba(108,192,74,0.15)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#D0D0D0'}}>{label} Performance Review — {yr}</div>
+                <button style={{...C.btn('p'),fontSize:11}} onClick={()=>{
+                  const txt=`PERFORMANCE REVIEW SUMMARY\n${label} ${yr}\nAttorney: ${profile?.full_name}\n\nBilling Units: ${units}${tgt>0?` / ${tgt} target (${pct3}%)`:''}
+\nBillable Time: ${toHm2(sec)}\nUtilisation: ${util}%\nRevenue Invoiced: R${invAmt.toFixed(2)} incl. VAT\n\nMonthly Breakdown:\n${months.map(m=>{const u=allActs.filter(a=>a.is_billable&&a.date?.startsWith(m)).reduce((s,a)=>s+(a.billing_units||0),0);return new Date(m+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})+': '+u+' units';}).join('\n')}`;
+                  navigator.clipboard.writeText(txt);alert('✓ Performance summary copied — paste into your review document');
+                }}>📋 Copy for Review</button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+                {[{l:'Billing Units',v:units+(tgt>0?` / ${tgt}`:' units'),c:'#6CC04A'},{l:'Billable Time',v:toHm2(sec),c:'#4A90D9'},{l:'Utilisation',v:util+'%',c:util>=70?'#6CC04A':'#EAB308'},{l:'Revenue',v:'R'+invAmt.toLocaleString(undefined,{maximumFractionDigits:0}),c:'#6CC04A'}].map(({l,v,c})=>(<div key={l} style={C.stat(false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:6}}>{l}</div><div style={{fontSize:18,fontWeight:800,color:c}}>{v}</div></div>))}
+              </div>
+              {pct3!==null&&(<div style={{marginTop:12}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:11,color:'#555'}}>Target achievement</span><span style={{fontSize:11,fontWeight:700,color:pct3>=100?'#6CC04A':pct3>=70?'#EAB308':'#E05252'}}>{pct3}%</span></div><div style={{height:8,background:'#1A1A1A',borderRadius:4}}><div style={{width:`${Math.min(pct3,100)}%`,height:'100%',background:pct3>=100?'#6CC04A':pct3>=70?'#EAB308':'#E05252',borderRadius:4}}/></div></div>)}
+            </div>);
+          };
+          return(<div style={{marginTop:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Bi-Annual Performance Review</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              {halfSummary(h1months,'H1 (Jan–Jun')}
+              {halfSummary(h2months,'H2 (Jul–Dec')}
+            </div>
+          </div>);
+        })()}
+      </div>)}
 
       {tab==='trust'&&(<div style={C.main}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:10}}><div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>🏦 Trust Accounting</div><div style={{fontSize:11,color:'#444'}}>Legal Practice Act compliant · 3 branches · balance never goes negative · payments ≥ {fmtR(APPROVAL_THRESHOLD)} require approval</div></div><button style={C.btn()} onClick={loadTrust}>↻ Refresh</button></div><TrustTab/></div>)}
     </div>

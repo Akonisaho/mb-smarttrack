@@ -95,6 +95,9 @@ export default function Manager() {
   const [vatPeriod,setVatPeriod]           = useState(new Date().toLocaleDateString('en-CA').substring(0,7));
   const [closingMatter,setClosingMatter]   = useState(null);
   const [closureForm,setClosureForm]       = useState({closure_notes:''});
+  const [perfAtty,setPerfAtty]             = useState('all');
+  const [perfYear,setPerfYear]             = useState(new Date().getFullYear());
+  const [courtFilter,setCourtFilter]       = useState('');
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -1048,6 +1051,145 @@ export default function Manager() {
               <td style={{...C.td,fontSize:10,color:'#555'}}>{l.details?JSON.stringify(l.details).substring(0,60):'—'}</td>
             </tr>))}
           </tbody></table></div>}
+        </div>)}
+
+        {/* ── FIRM PERFORMANCE TAB ─────────────────────────── */}
+        {tab==='firmperformance'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Performance</div><div style={{fontSize:11,color:'#444'}}>Attorney performance · bi-annual review reports</div></div>
+            <div style={{display:'flex',gap:8}}><select style={C.sel} value={perfYear} onChange={e=>setPerfYear(Number(e.target.value))}>{[2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}</select><select style={C.sel} value={perfAtty} onChange={e=>setPerfAtty(e.target.value)}><option value="all">All attorneys</option>{profiles.filter(p=>p.role==='attorney'||p.role==='branch_manager').map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></div>
+          </div>
+          {(()=>{
+            const attyList=perfAtty==='all'?profiles.filter(p=>p.role==='attorney'||p.role==='branch_manager'):[profiles.find(p=>p.id===perfAtty)].filter(Boolean);
+            const h1months=Array.from({length:6},(_,i)=>`${perfYear}-${String(i+1).padStart(2,'0')}`);
+            const h2months=Array.from({length:6},(_,i)=>`${perfYear}-${String(i+7).padStart(2,'0')}`);
+            const toHm2=(s)=>{s=Number(s)||0;if(s<=0)return'0m';const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}h ${m}m`:`${m}m`;};
+            const getStats=(atty,months)=>{
+              const acts=allTime.filter(a=>a.user_id===atty.id&&a.is_billable&&months.some(m=>a.date?.startsWith(m)));
+              const allA=allTime.filter(a=>a.user_id===atty.id&&months.some(m=>a.date?.startsWith(m)));
+              const units=acts.reduce((s,a)=>s+(a.billing_units||0),0);
+              const sec=acts.reduce((s,a)=>s+(a.duration_seconds||0),0);
+              const totalSec=allA.reduce((s,a)=>s+(a.duration_seconds||0),0);
+              const invAmt=invoices.filter(i=>i.user_id===atty.id&&months.some(m=>i.created_at?.startsWith(m))).reduce((s,i)=>s+(i.total_units||0)*(i.rate||atty.rate||150)*1.15,0);
+              const tgt=(atty.monthly_target||0)*6;
+              const pct=tgt>0?Math.round(units/tgt*100):null;
+              const util=totalSec>0?Math.round(sec/totalSec*100):0;
+              const monthly=months.map(m=>{const u=allTime.filter(a=>a.user_id===atty.id&&a.is_billable&&a.date?.startsWith(m)).reduce((s,a)=>s+(a.billing_units||0),0);return{m,u,label:new Date(m+'-01T12:00:00').toLocaleString('en-ZA',{month:'short'})};});
+              return{units,sec,totalSec,invAmt,pct,util,tgt,monthly};
+            };
+            return attyList.map(atty=>{
+              const s1=getStats(atty,h1months),s2=getStats(atty,h2months);
+              const br=branches.find(b=>b.id===atty.branch_id);
+              return(<div key={atty.id} style={{...C.card,marginBottom:20}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
+                  <div><div style={{fontSize:14,fontWeight:700,color:'#D0D0D0'}}>{atty.full_name}</div><div style={{fontSize:11,color:'#555'}}>{atty.email} · {br?.name||'—'} · Target: {atty.monthly_target||0} units/month</div></div>
+                  <button style={{...C.btn('p'),fontSize:11}} onClick={()=>{
+                    const txt=`PERFORMANCE REVIEW ${perfYear}\nAttorney: ${atty.full_name}\nFirm: ${branches.find(b=>b.id===atty.branch_id)?.name||'—'}\nMonthly Target: ${atty.monthly_target||0} units\n\nH1 (Jan–Jun):\nUnits: ${s1.units}${s1.tgt>0?' / '+s1.tgt+' ('+s1.pct+'%':''}\nBillable Time: ${toHm2(s1.sec)}\nUtilisation: ${s1.util}%\nRevenue: R${s1.invAmt.toFixed(2)}\n\nH2 (Jul–Dec):\nUnits: ${s2.units}${s2.tgt>0?' / '+s2.tgt+' ('+s2.pct+'%':''}\nBillable Time: ${toHm2(s2.sec)}\nUtilisation: ${s2.util}%\nRevenue: R${s2.invAmt.toFixed(2)}\n\nMonthly Detail:\n${[...h1months,...h2months].map(m=>{const u=allTime.filter(a=>a.user_id===atty.id&&a.is_billable&&a.date?.startsWith(m)).reduce((s,a)=>s+(a.billing_units||0),0);return new Date(m+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})+' '+perfYear+': '+u+' units';}).join('\n')}`;
+                    navigator.clipboard.writeText(txt);showAlert('✓ Performance review copied to clipboard');
+                  }}>📋 Copy for Review</button>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                  {[{label:'H1 (Jan–Jun)',s:s1,months:h1months},{label:'H2 (Jul–Dec)',s:s2,months:h2months}].map(({label,s,months})=>(
+                    <div key={label} style={{background:'#0D0D0D',borderRadius:8,padding:14}}>
+                      <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:10}}>{label}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                        {[{l:'Units',v:s.units+(s.tgt>0?' / '+s.tgt:''),c:'#8DC63F'},{l:'Time',v:toHm2(s.sec),c:'#4A90D9'},{l:'Utilisation',v:s.util+'%',c:s.util>=70?'#8DC63F':'#EAB308'},{l:'Revenue',v:'R'+s.invAmt.toLocaleString(undefined,{maximumFractionDigits:0}),c:'#8DC63F'}].map(({l,v,c})=>(<div key={l}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>{l}</div><div style={{fontSize:14,fontWeight:700,color:c}}>{v}</div></div>))}
+                      </div>
+                      {s.pct!==null&&(<><div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}><span style={{fontSize:10,color:'#555'}}>Target</span><span style={{fontSize:10,fontWeight:700,color:s.pct>=100?'#8DC63F':s.pct>=70?'#EAB308':'#E05252'}}>{s.pct}%</span></div><div style={{height:6,background:'#1A1A1A',borderRadius:3}}><div style={{width:`${Math.min(s.pct,100)}%`,height:'100%',background:s.pct>=100?'#8DC63F':s.pct>=70?'#EAB308':'#E05252',borderRadius:3}}/></div></>)}
+                      <div style={{display:'flex',gap:4,marginTop:10,flexWrap:'wrap'}}>
+                        {s.monthly.map(({m,u,label:ml})=>{const tgt2=atty.monthly_target||0;const p=tgt2>0?Math.min(100,Math.round(u/tgt2*100)):null;const c=p===null?'#444':p>=100?'#8DC63F':p>=70?'#EAB308':'#E05252';return(<div key={m} style={{flex:1,minWidth:30,textAlign:'center'}}><div style={{fontSize:8,color:'#333',marginBottom:2}}>{ml}</div><div style={{height:30,background:'#111',borderRadius:3,display:'flex',alignItems:'flex-end',overflow:'hidden'}}><div style={{width:'100%',background:c,height:`${u>0?Math.max(15,p||20):0}%`,borderRadius:'2px 2px 0 0'}}/></div><div style={{fontSize:8,color:c,fontWeight:700,marginTop:1}}>{u}</div></div>);})}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>);
+            });
+          })()}
+        </div>)}
+
+        {/* ── COURT ROLL TAB ───────────────────────────────── */}
+        {tab==='courtroll'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Court Roll</div><div style={{fontSize:11,color:'#444'}}>All upcoming court appearances across all matters</div></div>
+            <div style={{display:'flex',gap:8}}><input type="text" style={C.sel} placeholder="Filter by attorney or matter..." value={courtFilter} onChange={e=>setCourtFilter(e.target.value)}/></div>
+          </div>
+          {(()=>{
+            const today=new Date().toLocaleDateString('en-CA');
+            const courtEvents=(()=>{
+              return [];
+            })();
+            const upcomingMatters=matters.filter(m=>{
+              if(m.status==='closed') return false;
+              if(courtFilter){const q=courtFilter.toLowerCase();const atty=profiles.find(p=>p.id===m.user_id);return m.id.toLowerCase().includes(q)||m.client.toLowerCase().includes(q)||atty?.full_name.toLowerCase().includes(q);}
+              return true;
+            }).filter(m=>m.prescription_date||m.next_action_date);
+            const sorted=upcomingMatters.sort((a,b)=>{const da=a.prescription_date||a.next_action_date||'9999';const db=b.prescription_date||b.next_action_date||'9999';return da.localeCompare(db);});
+            return(<>
+              {!sorted.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>⚖️</div><div style={{fontSize:14}}>No court dates or action dates set</div><div style={{fontSize:11,color:'#333',marginTop:6}}>Set prescription dates and next action dates on matters to see them here</div></div>):
+              <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Type','Matter','Client','Attorney','Days Away','Status'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+                {sorted.map(m=>{
+                  const atty=profiles.find(p=>p.id===m.user_id);
+                  const dates=[];
+                  if(m.prescription_date) dates.push({date:m.prescription_date,type:'Prescription',urgent:Math.floor((new Date(m.prescription_date)-new Date())/86400000)<=30});
+                  if(m.next_action_date) dates.push({date:m.next_action_date,type:'Next Action',urgent:Math.floor((new Date(m.next_action_date)-new Date())/86400000)<=7});
+                  return dates.map((d,i)=>{
+                    const days=Math.floor((new Date(d.date)-new Date())/86400000);
+                    return(<tr key={m.id+i} style={{background:d.urgent?'rgba(220,80,80,0.04)':''}}>
+                      <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:d.urgent?'#E05252':'#888'}}>{fmtDate(d.date)}</td>
+                      <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:d.type==='Prescription'?'rgba(220,80,80,0.1)':'rgba(234,179,8,0.1)',color:d.type==='Prescription'?'#E05252':'#EAB308',fontWeight:600}}>{d.type}</span></td>
+                      <td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td>
+                      <td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td>
+                      <td style={{...C.td,color:'#4A90D9',fontSize:11}}>{atty?.full_name||'—'}</td>
+                      <td style={{...C.td,fontFamily:'monospace',color:days<=7?'#E05252':days<=30?'#EAB308':'#555',fontWeight:days<=30?700:400}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'TODAY':`${days}d`}</td>
+                      <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:m.status==='closed'?'rgba(85,85,85,0.2)':'rgba(141,198,63,0.1)',color:m.status==='closed'?'#555':'#8DC63F',fontWeight:600}}>{m.status||'open'}</span></td>
+                    </tr>);
+                  });
+                })}
+              </tbody></table></div>}
+            </>);
+          })()}
+        </div>)}
+
+        {/* ── DOCUMENT TEMPLATES TAB ───────────────────────── */}
+        {tab==='templates'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Document Templates</div><div style={{fontSize:11,color:'#444'}}>Generate standard firm documents — select matter to fill in details</div></div>
+          </div>
+          {(()=>{
+            const [selMatter,setSelMatter]=[useState(''),v=>{}];
+            const m=matters.find(x=>x.id===selMatter[0]);
+            const atty=m?profiles.find(p=>p.id===m.user_id):null;
+            const today3=new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'});
+            const [firmData]=useState({});
+            const templates=[
+              {id:'engagement',label:'Letter of Engagement',icon:'📋',desc:'Formal letter setting out the firm\'s mandate and fee arrangement'},
+              {id:'demand',label:'Letter of Demand',icon:'⚠️',desc:'Formal demand for payment or performance'},
+              {id:'trust_receipt',label:'Trust Receipt',icon:'🏦',desc:'Acknowledgement of funds received into trust'},
+              {id:'withdrawal',label:'Notice of Withdrawal',icon:'📄',desc:'Notice of withdrawal as attorney of record'},
+            ];
+            const generate=(tplId)=>{
+              const matter=matters.find(x=>x.id===selMatter[0]);
+              const attorney=matter?profiles.find(p=>p.id===matter.user_id):null;
+              let html='';
+              const header=`<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:20px"><strong style="font-size:18px">MOTSOENENG BILL ATTORNEYS</strong><br/><small>Attorneys · Notaries · Conveyancers</small></div>`;
+              const footer=`<div style="margin-top:40px;border-top:1px solid #ccc;padding-top:12px;font-size:11px;text-align:center">Motsoeneng Bill Attorneys · Reg: ${new Date().getFullYear()}</div>`;
+              if(tplId==='engagement'){html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Letter of Engagement</title><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}h3{text-transform:uppercase}</style></head><body>${header}<p><strong>DATE:</strong> ${today3}</p><p><strong>Our Ref:</strong> ${matter?.id||'[MATTER REF]'}</p><br/><p><strong>TO: ${matter?.client||'[CLIENT NAME]'}</strong></p><br/><h3>LETTER OF ENGAGEMENT</h3><p>Dear ${matter?.client||'[Client]'},</p><p>We refer to your recent instructions and hereby confirm our mandate to act on your behalf in the following matter:</p><p><strong>Matter:</strong> ${matter?.name||'[MATTER DESCRIPTION]'}</p><p><strong>Attorney responsible:</strong> ${attorney?.full_name||'[ATTORNEY]'}</p><br/><p><strong>FEES AND BILLING</strong></p><p>Our fees are charged on the basis of billing units of 6 minutes each at the rate of R${attorney?.rate||150} per unit. You will receive monthly invoices which are payable within 30 days.</p><p>Should you have any queries, please do not hesitate to contact us.</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${attorney?.full_name||'[ATTORNEY]'}</strong><br/>Motsoeneng Bill Attorneys</p>${footer}</body></html>`;}
+              else if(tplId==='demand'){html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Letter of Demand</title><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}h3{text-transform:uppercase}</style></head><body>${header}<p><strong>DATE:</strong> ${today3}</p><p><strong>Our Ref:</strong> ${matter?.id||'[MATTER REF]'}</p><br/><p><strong>BY EMAIL AND REGISTERED POST</strong></p><br/><p><strong>TO: ${matter?.client||'[RESPONDENT]'}</strong></p><br/><h3>LETTER OF DEMAND</h3><p>We act on behalf of our client and hereby demand that you:</p><ol><li>[State demand clearly]</li><li>Comply within <strong>7 (seven)</strong> days of receipt of this letter.</li></ol><p>Should you fail to comply, our client will have no alternative but to institute legal proceedings against you without further notice, in which event you will be liable for all legal costs on an attorney and own client scale.</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${attorney?.full_name||'[ATTORNEY]'}</strong><br/>Motsoeneng Bill Attorneys<br/>Attorneys for [Client]</p>${footer}</body></html>`;}
+              else if(tplId==='trust_receipt'){html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Trust Receipt</title><style>body{font-family:'Arial',sans-serif;max-width:600px;margin:40px auto;padding:40px;font-size:13px}</style></head><body>${header}<h3 style="text-align:center">TRUST RECEIPT</h3><table style="width:100%;border-collapse:collapse;margin-top:20px"><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Date</strong></td><td style="padding:8px;border:1px solid #ccc">${today3}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Received from</strong></td><td style="padding:8px;border:1px solid #ccc">${matter?.client||'[CLIENT]'}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Matter</strong></td><td style="padding:8px;border:1px solid #ccc">${matter?.id||'[MATTER REF]'} — ${matter?.name||'[MATTER]'}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Amount</strong></td><td style="padding:8px;border:1px solid #ccc">R [AMOUNT]</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Purpose</strong></td><td style="padding:8px;border:1px solid #ccc">[PURPOSE OF FUNDS]</td></tr></table><br/><p>The above amount has been deposited into our trust account:</p><p><strong>Bank:</strong> [BANK] | <strong>Account:</strong> [ACCOUNT NO] | <strong>Branch:</strong> [BRANCH CODE]</p><br/><p>Signed: _________________________<br/>${attorney?.full_name||'[ATTORNEY]'}</p>${footer}</body></html>`;}
+              else{html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Notice of Withdrawal</title><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}</style></head><body>${header}<p><strong>DATE:</strong> ${today3}</p><br/><p><strong>TO: The Registrar / Clerk of the Court</strong></p><br/><h3>NOTICE OF WITHDRAWAL AS ATTORNEY OF RECORD</h3><p>Matter: ${matter?.id||'[MATTER REF]'}<br/>Client: ${matter?.client||'[CLIENT]'}</p><p>TAKE NOTICE THAT the firm of MOTSOENENG BILL ATTORNEYS hereby withdraws as attorney of record for ${matter?.client||'[CLIENT]'} in the above matter, effective immediately.</p><p>The last known address of our client is: [CLIENT ADDRESS]</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${attorney?.full_name||'[ATTORNEY]'}</strong><br/>Motsoeneng Bill Attorneys</p>${footer}</body></html>`;}
+              const w=window.open('','_blank','width=900,height=700');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+            };
+            const [sel,setSel]=useState('');
+            return(<>
+              <div style={{...C.card,marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:10}}>Select Matter (optional — pre-fills client details)</div>
+                <select style={{...C.sel,maxWidth:500}} value={sel} onChange={e=>setSel(e.target.value)}><option value="">— No matter selected (blank template) —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.name} — {m.client}</option>)}</select>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
+                {templates.map(t=>(<div key={t.id} style={C.card}><div style={{fontSize:24,marginBottom:8}}>{t.icon}</div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{t.label}</div><div style={{fontSize:11,color:'#555',marginBottom:12}}>{t.desc}</div><button style={C.btn('p')} onClick={()=>{const m2=sel?matters.find(x=>x.id===sel):null;const a2=m2?profiles.find(p=>p.id===m2.user_id):null;const today4=new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'});const header2=`<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:20px"><strong style="font-size:18px">MOTSOENENG BILL ATTORNEYS</strong><br/><small>Attorneys · Notaries · Conveyancers</small></div>`;const footer2=`<div style="margin-top:40px;border-top:1px solid #ccc;padding-top:12px;font-size:11px;text-align:center">Motsoeneng Bill Attorneys</div>`;let html2='';if(t.id==='engagement'){html2=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}</style></head><body>${header2}<p><strong>DATE:</strong> ${today4}</p><p><strong>Our Ref:</strong> ${m2?.id||'[MATTER REF]'}</p><br/><p><strong>TO: ${m2?.client||'[CLIENT NAME]'}</strong></p><br/><h3 style="text-transform:uppercase">Letter of Engagement</h3><p>Dear ${m2?.client||'[Client]'},</p><p>We confirm our mandate to act on your behalf in: <strong>${m2?.name||'[MATTER]'}</strong></p><p>Attorney responsible: <strong>${a2?.full_name||'[ATTORNEY]'}</strong></p><p>Our fees are charged at R${a2?.rate||150} per billing unit (6 minutes).</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${a2?.full_name||'[ATTORNEY]'}</strong><br/>Motsoeneng Bill Attorneys</p>${footer2}</body></html>`;}else if(t.id==='demand'){html2=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}</style></head><body>${header2}<p><strong>DATE:</strong> ${today4}</p><p><strong>Our Ref:</strong> ${m2?.id||'[MATTER REF]'}</p><br/><h3 style="text-transform:uppercase">Letter of Demand</h3><p>We hereby demand that you comply with the following within <strong>7 days</strong>:</p><p>[STATE DEMAND]</p><p>Failure to comply will result in legal proceedings without further notice.</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${a2?.full_name||'[ATTORNEY]'}</strong><br/>Attorneys for ${m2?.client||'[Client]'}</p>${footer2}</body></html>`;}else if(t.id==='trust_receipt'){html2=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:40px;font-size:13px}</style></head><body>${header2}<h3 style="text-align:center;text-transform:uppercase">Trust Receipt</h3><table style="width:100%;border-collapse:collapse;margin-top:20px"><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Date</strong></td><td style="padding:8px;border:1px solid #ccc">${today4}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Received from</strong></td><td style="padding:8px;border:1px solid #ccc">${m2?.client||'[CLIENT]'}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Matter</strong></td><td style="padding:8px;border:1px solid #ccc">${m2?.id||'[REF]'} — ${m2?.name||'[MATTER]'}</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Amount</strong></td><td style="padding:8px;border:1px solid #ccc">R ___________</td></tr><tr><td style="padding:8px;border:1px solid #ccc;background:#f8f8f8"><strong>Purpose</strong></td><td style="padding:8px;border:1px solid #ccc">___________</td></tr></table><br/><p>Signed: _________________________<br/>${a2?.full_name||'[ATTORNEY]'}</p>${footer2}</body></html>`;}else{html2=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:40px;font-size:13px;line-height:1.6}</style></head><body>${header2}<h3 style="text-transform:uppercase">Notice of Withdrawal as Attorney of Record</h3><p>Date: ${today4}</p><p>Matter: ${m2?.id||'[REF]'} — Client: ${m2?.client||'[CLIENT]'}</p><p>TAKE NOTICE that MOTSOENENG BILL ATTORNEYS hereby withdraws as attorney of record for ${m2?.client||'[CLIENT]'}, effective immediately.</p><br/><p>Yours faithfully,</p><br/><br/><p><strong>${a2?.full_name||'[ATTORNEY]'}</strong><br/>Motsoeneng Bill Attorneys</p>${footer2}</body></html>`;}const w=window.open('','_blank','width=900,height=700');w.document.write(html2);w.document.close();setTimeout(()=>w.print(),500);}}>Generate &amp; Print</button></div>))}
+              </div>
+            </>);
+          })()}
         </div>)}
 
         {/* ── MODALS: Undertaking form ─────────────────────── */}

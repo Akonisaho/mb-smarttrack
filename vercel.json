@@ -2,5 +2,19 @@
   "name": "mb-smarttrack",
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    {
+      "path": "/api/cron/prescription-alerts",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/overdue-reminders",
+      "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/monthly-snapshot",
+      "schedule": "0 6 1 * *"
+    }
+  ]
 }
