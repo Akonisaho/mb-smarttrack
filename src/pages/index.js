@@ -197,7 +197,7 @@ const rFormDirty=useRef(false);
       if(p?.role==='manager'||p?.role==='national_manager'||u.email==='livhuwaningwn@gmail.com'){ router.replace(p?.password_changed===false?'/change-password':'/manager'); return; }
       if(p?.role==='branch_manager'){ router.replace(p?.password_changed===false?'/change-password':'/manager'); return; }
       if(p?.role==='bookkeeper'){ router.replace(p?.password_changed===false?'/change-password':'/bookkeeper'); return; }
-      if(p?.role==='receptionist'){ router.replace(p?.password_changed===false?'/change-password':'/receptionist'); return; }
+      if(p?.role==='receptionist'||p?.role==='hr'){ router.replace(p?.password_changed===false?'/change-password':'/receptionist'); return; }
       if(p?.password_changed===false){ router.replace('/change-password'); return; }
       setAuthLoading(false);
     });
