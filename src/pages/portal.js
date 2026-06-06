@@ -66,7 +66,7 @@ function downloadInvoicePDF(inv, firm, clientName) {
 
 export default function ClientPortal() {
   const firm = useFirmSettings();
-  const [step, setStep] = useState('email'); // email → otp → portal
+  const [step, setStep] = useState('email'); // email → otp → portal | request
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [clientId, setClientId] = useState(null);
@@ -80,6 +80,12 @@ export default function ClientPortal() {
   const [payments, setPayments] = useState([]);
   const otpRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
   const [otpDigits, setOtpDigits] = useState(['','','','','','']);
+  const [showServiceReq, setShowServiceReq] = useState(false);
+  const [serviceForm, setServiceForm] = useState({serviceType:'',description:'',urgency:'normal'});
+  const [submittingReq, setSubmittingReq] = useState(false);
+  const [reqForm, setReqForm] = useState({fullName:'',email:'',phone:'',idNumber:'',serviceType:'',description:'',urgency:'normal'});
+  const [reqSubmitting, setReqSubmitting] = useState(false);
+  const [reqSuccess, setReqSuccess] = useState(false);
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -163,6 +169,55 @@ export default function ClientPortal() {
     </div>
   );
 
+  const SERVICE_TYPES = ['Conveyancing','Litigation','Family Law','Contract Review','Estate Planning','Labour Law','Corporate Law','Criminal Law','Immigration','General Consultation','Other'];
+
+  if (step === 'request') return (<>
+    <Head><title>Request Services — {firm.firm_name}</title></Head>
+    <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif;background:#F9FAFB}input:focus,select:focus,textarea:focus{border-color:#8DC63F!important;outline:1px solid rgba(141,198,63,0.4)!important}textarea{resize:vertical}`}</style>
+    <div style={{...C.light,padding:'24px 16px'}}>
+      <div style={{maxWidth:520,margin:'0 auto'}}>
+        <div style={{textAlign:'center',marginBottom:24}}>
+          <div style={{fontWeight:900,fontSize:24,letterSpacing:'-0.04em',marginBottom:4}}>{firm.firm_name||'MB SmartTrack'}</div>
+          <div style={{fontSize:13,color:'#9CA3AF'}}>Request Legal Services</div>
+        </div>
+        {reqSuccess?(<div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:32,textAlign:'center'}}>
+          <div style={{fontSize:32,marginBottom:12}}>✅</div>
+          <div style={{fontSize:18,fontWeight:700,color:'#166534',marginBottom:8}}>Request Submitted!</div>
+          <div style={{fontSize:14,color:'#555',marginBottom:20}}>Thank you. We have received your request and will be in contact with you shortly. A confirmation has been sent to your email.</div>
+          <button style={{...C.btn,width:'auto',padding:'12px 28px'}} onClick={()=>{setStep('email');setReqSuccess(false);}}>Back to Login</button>
+        </div>):(<div style={{background:'#fff',border:'1px solid #E5E7EB',borderRadius:12,padding:28}}>
+          <div style={{fontSize:18,fontWeight:700,marginBottom:4}}>New Service Request</div>
+          <div style={{fontSize:13,color:'#9CA3AF',marginBottom:20}}>Fill in your details and we'll get back to you as soon as possible.</div>
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Full Name *</label><input style={C.inp} placeholder="Your full name" value={reqForm.fullName} onChange={e=>setReqForm(f=>({...f,fullName:e.target.value}))}/></div>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Email *</label><input style={C.inp} type="email" placeholder="your@email.com" value={reqForm.email} onChange={e=>setReqForm(f=>({...f,email:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Phone</label><input style={C.inp} placeholder="Phone number" value={reqForm.phone} onChange={e=>setReqForm(f=>({...f,phone:e.target.value}))}/></div>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>ID / Passport No.</label><input style={C.inp} placeholder="Optional" value={reqForm.idNumber} onChange={e=>setReqForm(f=>({...f,idNumber:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Service Type *</label><select style={{...C.inp,padding:'12px'}} value={reqForm.serviceType} onChange={e=>setReqForm(f=>({...f,serviceType:e.target.value}))}><option value="">— Select service —</option>{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+              <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Urgency</label><select style={{...C.inp,padding:'12px'}} value={reqForm.urgency} onChange={e=>setReqForm(f=>({...f,urgency:e.target.value}))}><option value="low">Low — no rush</option><option value="normal">Normal</option><option value="urgent">Urgent — time sensitive</option></select></div>
+            </div>
+            <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Brief Description *</label><textarea style={{...C.inp,minHeight:90}} placeholder="Please describe your legal matter briefly..." value={reqForm.description} onChange={e=>setReqForm(f=>({...f,description:e.target.value}))}/></div>
+            {error&&<div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:6,padding:'10px 14px',fontSize:12,color:'#DC2626'}}>{error}</div>}
+            <button style={{...C.btn,opacity:reqSubmitting||!reqForm.fullName||!reqForm.email||!reqForm.serviceType||!reqForm.description?0.6:1}} disabled={reqSubmitting||!reqForm.fullName||!reqForm.email||!reqForm.serviceType||!reqForm.description} onClick={async()=>{
+              setReqSubmitting(true); setError('');
+              const res=await fetch('/api/client-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(reqForm)});
+              const data=await res.json();
+              setReqSubmitting(false);
+              if(!res.ok){setError(data.error||'Something went wrong. Please try again.');return;}
+              setReqSuccess(true);
+            }}>{reqSubmitting?'Submitting…':'Submit Request'}</button>
+          </div>
+          <div style={{textAlign:'center',marginTop:16}}><button style={{background:'none',border:'none',color:'#9CA3AF',fontSize:12,cursor:'pointer'}} onClick={()=>setStep('email')}>← Back to login</button></div>
+        </div>)}
+      </div>
+    </div>
+  </>);
+
   if (step === 'email') return (<>
     <Head><title>Client Portal — {firm.firm_name}</title></Head>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif;background:#F9FAFB}input:focus{border-color:#8DC63F!important;outline:1px solid rgba(141,198,63,0.4)!important}`}</style>
@@ -176,6 +231,10 @@ export default function ClientPortal() {
           <button style={{...C.btn,opacity:loading?.6:1}} disabled={loading} onClick={sendOtp}>{loading?'Sending code…':'Send Login Code'}</button>
         </div>
         <div style={{textAlign:'center',marginTop:16,fontSize:11,color:'#D1D5DB'}}>A 6-digit code will be emailed to you. Valid for 10 minutes.</div>
+        <div style={{borderTop:'1px solid #F3F4F6',marginTop:20,paddingTop:16,textAlign:'center'}}>
+          <div style={{fontSize:12,color:'#9CA3AF',marginBottom:8}}>Not yet a client?</div>
+          <button style={{background:'transparent',border:'1px solid #D1D5DB',color:'#374151',padding:'10px 20px',borderRadius:8,cursor:'pointer',fontSize:13,fontFamily:'inherit',fontWeight:600,width:'100%'}} onClick={()=>setStep('request')}>Request Legal Services →</button>
+        </div>
       </div>
     </>)}
   </>);
@@ -225,8 +284,37 @@ export default function ClientPortal() {
         </div>
       </div>
       <div style={C.main}>
-        <div style={{fontSize:22,fontWeight:700,marginBottom:4}}>My Account</div>
-        <div style={{fontSize:13,color:'#9CA3AF',marginBottom:20}}>As at {new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'})}</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+          <div>
+            <div style={{fontSize:22,fontWeight:700,marginBottom:4}}>My Account</div>
+            <div style={{fontSize:13,color:'#9CA3AF'}}>As at {new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'})}</div>
+          </div>
+          <button style={{background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'10px 20px',borderRadius:8,cursor:'pointer',fontSize:13,fontFamily:'inherit',fontWeight:700}} onClick={()=>setShowServiceReq(true)}>+ Request a Service</button>
+        </div>
+
+        {/* SERVICE REQUEST MODAL */}
+        {showServiceReq&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:100,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowServiceReq(false)}>
+          <div style={{background:'#fff',borderRadius:12,padding:28,width:'100%',maxWidth:480}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:16,fontWeight:700,color:'#111',marginBottom:4}}>Request a Service</div>
+            <div style={{fontSize:13,color:'#9CA3AF',marginBottom:20}}>Tell us what you need and we'll get back to you.</div>
+            {submittingReq?<div style={{textAlign:'center',padding:20,color:'#8DC63F',fontWeight:700}}>✓ Request submitted! We'll be in touch shortly.</div>:(<>
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Service Type *</label><select style={{...C.inp,padding:'12px'}} value={serviceForm.serviceType} onChange={e=>setServiceForm(f=>({...f,serviceType:e.target.value}))}><option value="">— Select service type —</option>{['Conveyancing','Litigation','Family Law','Contract Review','Estate Planning','Labour Law','Corporate Law','Criminal Law','Immigration','General Consultation','Other'].map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+                <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Urgency</label><select style={{...C.inp,padding:'12px'}} value={serviceForm.urgency} onChange={e=>setServiceForm(f=>({...f,urgency:e.target.value}))}><option value="low">Low — no rush</option><option value="normal">Normal</option><option value="urgent">Urgent — time sensitive</option></select></div>
+                <div><label style={{fontSize:11,color:'#666',display:'block',marginBottom:4}}>Description *</label><textarea style={{...C.inp,minHeight:80,resize:'vertical'}} placeholder="Describe what you need help with..." value={serviceForm.description} onChange={e=>setServiceForm(f=>({...f,description:e.target.value}))}/></div>
+              </div>
+              <div style={{display:'flex',gap:10,marginTop:20}}>
+                <button style={{flex:1,background:'transparent',border:'1px solid #D1D5DB',color:'#374151',padding:'12px',borderRadius:8,cursor:'pointer',fontSize:13,fontFamily:'inherit',fontWeight:600}} onClick={()=>setShowServiceReq(false)}>Cancel</button>
+                <button style={{flex:2,background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'12px',borderRadius:8,cursor:'pointer',fontSize:13,fontFamily:'inherit',fontWeight:700,opacity:!serviceForm.serviceType||!serviceForm.description?0.6:1}} disabled={!serviceForm.serviceType||!serviceForm.description} onClick={async()=>{
+                  setSubmittingReq(true);
+                  const res=await fetch('/api/portal-service-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId,serviceType:serviceForm.serviceType,description:serviceForm.description,urgency:serviceForm.urgency})});
+                  setSubmittingReq(false);
+                  if(res.ok){setServiceForm({serviceType:'',description:'',urgency:'normal'});setTimeout(()=>{setShowServiceReq(false);setSubmittingReq(false);},2000);}
+                }}>Submit Request</button>
+              </div>
+            </>)}
+          </div>
+        </div>)}
 
         {/* SUMMARY */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20}}>

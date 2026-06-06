@@ -22,6 +22,7 @@ const NAV = {
     { type:'group', label:'Practice', items:[
       { label:'Matters', id:'matters' },
       { label:'Clients', id:'clients' },
+      { label:'Requests', id:'requests' },
       { label:'Undertakings', id:'undertakings' },
       { label:'Communications', id:'communications' },
       { label:'Templates', id:'templates' },

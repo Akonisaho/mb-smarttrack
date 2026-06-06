@@ -99,6 +99,7 @@ export default function Manager() {
   const [perfYear,setPerfYear]             = useState(new Date().getFullYear());
   const [courtFilter,setCourtFilter]       = useState('');
   const [selTemplate,setSelTemplate]       = useState('');
+  const [clientRequests,setClientRequests] = useState([]);
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -159,6 +160,7 @@ export default function Manager() {
     if(tab==='undertakings'&&!loading) fetchUndertakings({}).then(r=>setUndertakings(r.undertakings||[]));
     if(tab==='communications'&&!loading) fetchClientCommunications({}).then(r=>setCommunications(r.communications||[]));
     if(tab==='audit'&&!loading){ setAuditLoading(true); fetchAuditLog({}).then(r=>{setAuditLogs(r.logs||[]);setAuditLoading(false);}); }
+    if(tab==='requests'&&!loading) supabase.from('client_requests').select('*').order('created_at',{ascending:false}).then(({data})=>setClientRequests(data||[]));
   },[tab,loading]);
 
 
@@ -264,7 +266,12 @@ export default function Manager() {
     const result = await res.json();
     if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
-    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Temporary password: ${result.tempPassword||'see records'} — share this with the staff member.`,'success');
+    const tempPassword=result.tempPassword||'';
+    // Auto-send credentials email
+    if(tempPassword){
+      await fetch('/api/send-staff-credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fullName:inviteForm.fullName,email:inviteForm.email,role:inviteForm.role,tempPassword,branchName})});
+    }
+    showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Login details emailed to ${inviteForm.email}. Temporary password: ${tempPassword} — shown here as backup.`,'success');
     setInviting(false);
     setShowInvite(false);
     setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
@@ -1193,6 +1200,63 @@ export default function Manager() {
               </div>);
             })}
           </div>
+        </div>)}
+
+        {/* ── CLIENT REQUESTS TAB ──────────────────────────── */}
+        {tab==='requests'&&(<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Client Requests</div><div style={{fontSize:11,color:'#444'}}>New client enquiries and service requests from the portal</div></div>
+            <button style={C.btn()} onClick={()=>supabase.from('client_requests').select('*').order('created_at',{ascending:false}).then(({data})=>setClientRequests(data||[]))}>↻ Refresh</button>
+          </div>
+          {(()=>{
+            const pending=clientRequests.filter(r=>r.status==='pending');
+            const urgColor=(u)=>u==='urgent'?'#E05252':u==='low'?'#555':'#EAB308';
+            const statusBg=(s)=>s==='pending'?'rgba(234,179,8,0.1)':s==='converted'?'rgba(141,198,63,0.1)':s==='rejected'?'rgba(220,80,80,0.1)':'rgba(74,144,217,0.1)';
+            const statusCol=(s)=>s==='pending'?'#EAB308':s==='converted'?'#8DC63F':s==='rejected'?'#E05252':'#4A90D9';
+            return(<>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+                {[{l:'Total Requests',v:clientRequests.length},{l:'Pending',v:pending.length,w:pending.length>0},{l:'Converted to Clients',v:clientRequests.filter(r=>r.status==='converted').length,a:true}].map(({l,v,w,a})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
+              </div>
+              {!clientRequests.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📬</div><div style={{fontSize:14}}>No requests yet</div><div style={{fontSize:11,color:'#333',marginTop:6}}>Client requests submitted via the portal or request form will appear here</div></div>):
+              <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Date','Name','Email','Phone','Service','Urgency','Status','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+                {clientRequests.map(r=>(<tr key={r.id}>
+                  <td style={{...C.td,fontSize:10,color:'#666',whiteSpace:'nowrap'}}>{new Date(r.created_at).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})}</td>
+                  <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{r.full_name}</td>
+                  <td style={{...C.td,fontSize:11,color:'#555'}}>{r.email}</td>
+                  <td style={{...C.td,fontSize:11,color:'#555'}}>{r.phone||'—'}</td>
+                  <td style={{...C.td,color:'#8DC63F',fontWeight:600,fontSize:11}}>{r.service_type}</td>
+                  <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:'rgba(85,85,85,0.15)',color:urgColor(r.urgency),fontWeight:700,textTransform:'capitalize'}}>{r.urgency}</span></td>
+                  <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:statusBg(r.status),color:statusCol(r.status),fontWeight:600,textTransform:'capitalize'}}>{r.status}</span></td>
+                  <td style={C.td}><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                    {r.status==='pending'&&(<>
+                      <button style={{...C.btn('p'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{
+                        await supabase.from('client_requests').update({status:'reviewed',reviewed_by:profile?.id,reviewed_at:new Date().toISOString()}).eq('id',r.id);
+                        setClientRequests(prev=>prev.map(x=>x.id===r.id?{...x,status:'reviewed'}:x));
+                        showAlert(`✓ Request from ${r.full_name} marked as reviewed.`);
+                      }}>Review</button>
+                      <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={async()=>{
+                        // Convert to client
+                        router.push('/clients');
+                        showAlert(`Opening clients — add ${r.full_name} (${r.email}) as a new client.`,'success');
+                      }}>→ Client</button>
+                    </>)}
+                    {r.status==='reviewed'&&(
+                      <button style={{...C.btn('p'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{
+                        await supabase.from('client_requests').update({status:'converted'}).eq('id',r.id);
+                        setClientRequests(prev=>prev.map(x=>x.id===r.id?{...x,status:'converted'}:x));
+                        showAlert(`✓ Marked as converted.`);
+                      }}>✓ Converted</button>
+                    )}
+                    <button style={{...C.btn('r'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{
+                      if(!confirm('Reject this request?')) return;
+                      await supabase.from('client_requests').update({status:'rejected',reviewed_by:profile?.id}).eq('id',r.id);
+                      setClientRequests(prev=>prev.map(x=>x.id===r.id?{...x,status:'rejected'}:x));
+                    }}>Reject</button>
+                  </div></td>
+                </tr>))}
+              </tbody></table></div>}
+            </>);
+          })()}
         </div>)}
 
         {/* ── MODALS: Undertaking form ─────────────────────── */}
