@@ -5,7 +5,14 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "npx playwright test",
+    "test:manager": "npx playwright test tests/manager.spec.js",
+    "test:hr": "npx playwright test tests/hr.spec.js",
+    "test:auth": "npx playwright test tests/auth.spec.js",
+    "test:docs": "npx playwright test tests/documents.spec.js",
+    "test:offline": "npx playwright test tests/offline.spec.js",
+    "test:report": "npx playwright show-report test-report"
   },
   "dependencies": {
     "@supabase/auth-ui-react": "^0.4.7",
@@ -19,6 +26,7 @@
     "recharts": "^2.10.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "autoprefixer": "^10",
