@@ -100,6 +100,14 @@ export default function Manager() {
   const [courtFilter,setCourtFilter]       = useState('');
   const [selTemplate,setSelTemplate]       = useState('');
   const [clientRequests,setClientRequests] = useState([]);
+  const [showPayPlan,setShowPayPlan]       = useState(false);
+  const [payPlanInv,setPayPlanInv]         = useState(null);
+  const [payPlanForm,setPayPlanForm]       = useState({instalment:'',frequency:'monthly',start_date:new Date().toLocaleDateString('en-CA'),notes:''});
+  const [savingPlan,setSavingPlan]         = useState(false);
+  const [showOppForm,setShowOppForm]       = useState(false);
+  const [oppMatter,setOppMatter]           = useState(null);
+  const [oppForm,setOppForm]               = useState({opposing_party:'',opposing_attorney:'',opposing_firm:''});
+  const [appUrl]                           = useState(typeof window!=='undefined'?window.location.origin:'');
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -252,6 +260,12 @@ export default function Manager() {
   async function handleSaveComm(){ if(!commForm.body.trim()) return; const{error}=await saveClientCommunication({...commForm},profile?.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Communication logged.'); setShowCommForm(false); setCommForm({client_id:'',matter_id:'',comm_type:'call',direction:'outbound',subject:'',body:'',comm_date:new Date().toLocaleDateString('en-CA')}); const{communications:co}=await fetchClientCommunications({}); setCommunications(co); await logAudit('communication_logged','client',commForm.client_id,{type:commForm.comm_type},profile?.id); }
   async function handleCloseMatter(m){ if(!closureForm.closure_notes.trim()){showAlert('Please add closure notes.','error');return;} const{error}=await updateMatter(m.id,{status:'closed',closure_notes:closureForm.closure_notes,closed_at:new Date().toISOString(),closed_by:profile?.id}); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ Matter ${m.id} closed.`); setClosingMatter(null); setClosureForm({closure_notes:''}); load(); await logAudit('matter_closed','matter',m.id,{notes:closureForm.closure_notes},profile?.id); }
   async function handleAddInterest(inv){ const age=Math.floor((new Date()-new Date(inv.created_at||0))/86400000); const rate=10.5; const outstanding=Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0)); const interest=parseFloat((outstanding*(rate/100)*(age/365)).toFixed(2)); if(interest<=0){showAlert('No interest due — invoice is not overdue.','error');return;} if(!confirm(`Add R${interest} interest charge (${rate}% p.a. × ${age} days) to invoice ${inv.id}?`)) return; const{error}=await saveInterestCharge({invoiceId:inv.id,amount:interest,ratePercent:rate,daysOverdue:age},profile?.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ Interest charge of R${interest} added.`); await logAudit('interest_charged','invoice',inv.id,{amount:interest,days:age},profile?.id); }
+  async function handleApproveinvoice(invId){ const{error}=await supabase.from('invoices').update({status:'approved',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',invId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Invoice approved.'); load(); await logAudit('invoice_approved','invoice',invId,{},profile?.id); }
+  async function handleSavePayPlan(){ if(!payPlanForm.instalment||!payPlanInv) return; setSavingPlan(true); const total=(payPlanInv.total_units||0)*(payPlanInv.rate||150)*1.15; const months=Math.ceil(total/parseFloat(payPlanForm.instalment)); const instalments=Array.from({length:months},(_,i)=>{ const d=new Date(payPlanForm.start_date+'T12:00:00'); d.setMonth(d.getMonth()+i); const isLast=i===months-1; return{due_date:d.toLocaleDateString('en-CA'),amount:isLast?(total-(months-1)*parseFloat(payPlanForm.instalment)).toFixed(2):parseFloat(payPlanForm.instalment),status:'pending'}; }); const{error}=await supabase.from('payment_plans').insert([{invoice_id:payPlanInv.id,client_id:payPlanInv.client_id||null,total_amount:total,instalment:parseFloat(payPlanForm.instalment),frequency:payPlanForm.frequency,start_date:payPlanForm.start_date,notes:payPlanForm.notes,created_by:profile?.id}]).select(); setSavingPlan(false); if(error){showAlert('Error: '+error.message,'error');return;} showAlert(`✓ Payment plan created — ${months} instalments of R${payPlanForm.instalment}`); setShowPayPlan(false); setPayPlanInv(null); }
+  async function handleSaveOpp(){ if(!oppMatter) return; const{error}=await supabase.from('matters').update({opposing_party:oppForm.opposing_party,opposing_attorney:oppForm.opposing_attorney,opposing_firm:oppForm.opposing_firm}).eq('id',oppMatter.id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Opposing party saved.'); setShowOppForm(false); load(); }
+  async function sendSatisfactionRequest(matter){ const res=await fetch('/api/send-satisfaction-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matterId:matter.id,clientId:matter.client_id||null,attorneyId:matter.user_id,appUrl})}); const data=await res.json(); if(!res.ok){showAlert('Could not send: '+(data.error||'No client email'),'error');return;} showAlert(`✓ Satisfaction survey sent to client.`); }
+  async function updateFicaRisk(clientId,rating){ await supabase.from('clients').update({risk_rating:rating}).eq('id',clientId); showAlert('✓ Risk rating updated.'); load(); }
+
   async function sendOverdueReminders(){ const now=new Date(); const overdue=invoices.filter(inv=>{ const age=Math.floor((now-new Date(inv.created_at||0))/86400000); const paid=invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0); return age>30&&Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid)>0&&!inv.written_off; }); if(!overdue.length){showAlert('No overdue invoices to remind.','error');return;} let sent=0; for(const inv of overdue){ const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,type:'reminder'})}); if(res.ok) sent++; } showAlert(`✓ Sent ${sent} overdue reminders.`); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
@@ -583,6 +597,7 @@ export default function Manager() {
             <td style={{...C.td}}><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
               <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} disabled={emailingInv===inv.id} onClick={()=>{const em=prompt('Send to email:',inv.client_email||'');if(em===null)return;handleEmailInvoice(inv,em);}}>{emailingInv===inv.id?'…':'✉'}</button>
               <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>{setCnInvoice(inv);setCnForm({amount:'',reason:''});setShowCNForm(true);}}>CN</button>
+              <button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={()=>{setPayPlanInv(inv);setPayPlanForm({instalment:'',frequency:'monthly',start_date:new Date().toLocaleDateString('en-CA'),notes:''});setShowPayPlan(true);}}>Plan</button>
               {!inv.written_off?<button style={{...C.btn('warn'),fontSize:10,padding:'3px 8px'}} onClick={async()=>{const r=prompt('Write-off reason:');if(!r)return;await writeOffInvoice(inv.id,r,profile?.id);load();}}>W/O</button>:<button style={{...C.btn(),fontSize:10,padding:'3px 8px'}} onClick={async()=>{await undoWriteOff(inv.id);load();}}>Undo</button>}
             </div></td>
           </tr>);})}
@@ -697,7 +712,7 @@ export default function Manager() {
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Total Clients',v:clients.length},{l:'FICA Compliant',v:clients.filter(c=>ficaStatus(c.id)==='compliant').length,a:true},{l:'FICA Pending',v:clients.filter(c=>ficaStatus(c.id)==='pending').length,w:true},{l:'FICA Expired',v:clients.filter(c=>ficaStatus(c.id)==='expired').length,w:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
       </div>
-      <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Ref','Client','Type','Email','FICA','Matters'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
+      <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Ref','Client','Type','Email','FICA','Risk','Matters'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
         {!clients.length&&<tr><td colSpan={6} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No clients yet. <button style={{...C.btn('p'),fontSize:11,marginLeft:8}} onClick={()=>router.push('/clients')}>Add first client →</button></td></tr>}
         {clients.slice(0,50).map(c=>{const fs=ficaStatus(c.id);const fst=FSTA[fs]||FSTA.pending;const cm=matters.filter(m=>m.client_id===c.id);return(<tr key={c.id} style={{cursor:'pointer'}} onClick={()=>router.push('/clients')}>
           <td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#A78BFA'}}>{c.client_no||'—'}</td>
@@ -705,6 +720,7 @@ export default function Manager() {
           <td style={{...C.td,fontSize:10,textTransform:'capitalize',color:'#777'}}>{c.client_type||'individual'}</td>
           <td style={{...C.td,fontSize:10,color:'#555'}}>{c.email||'—'}</td>
           <td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,background:fst.bg,color:fst.color,border:`1px solid ${fst.color}44`,fontWeight:600}}>{fst.label}</span></td>
+          <td style={C.td}><select style={{...C.sel,fontSize:9,padding:'2px 6px'}} value={c.risk_rating||'low'} onChange={e=>updateFicaRisk(c.id,e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></td>
           <td style={{...C.td,fontFamily:'monospace',textAlign:'center',color:'#777'}}>{cm.length}</td>
         </tr>);})}
       </tbody></table></div>
@@ -892,8 +908,9 @@ export default function Manager() {
                   <div style={{textAlign:'center',minWidth:50}}><div style={{fontSize:9,color:'#555',marginBottom:2}}>Trust</div><div style={{fontSize:14,fontWeight:700,color:trustBal>0?'#4A90D9':'#444'}}>{fmtR(trustBal)}</div></div>
                   <div style={{display:'flex',flexDirection:'column',gap:5}}>
                     <button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={()=>{const nid=mgrNotesMatter===m.id?null:m.id;setMgrNotesMatter(nid);if(nid&&!mgrNotesMap[m.id])loadMgrNotes(m.id);}}>📝 {mgrNotesMap[m.id]?.length>0?`Notes (${mgrNotesMap[m.id].length})`:'Notes'}</button>
+                    <button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={()=>{setOppMatter(m);setOppForm({opposing_party:m.opposing_party||'',opposing_attorney:m.opposing_attorney||'',opposing_firm:m.opposing_firm||''});setShowOppForm(true);}}>⚔ Opposing</button>
                     {m.status!=='closed'&&<button style={{...C.btn('r'),fontSize:11,padding:'4px 10px'}} onClick={()=>{setClosingMatter(m);setClosureForm({closure_notes:''});}}>Close</button>}
-                    {m.status==='closed'&&<button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={async()=>{await updateMatter(m.id,{status:'open',closed_at:null,closed_by:null});load();}}>Reopen</button>}
+                    {m.status==='closed'&&<><button style={{...C.btn(),fontSize:11,padding:'4px 10px'}} onClick={async()=>{await updateMatter(m.id,{status:'open',closed_at:null,closed_by:null});load();}}>Reopen</button><button style={{...C.btn('p'),fontSize:11,padding:'4px 10px'}} onClick={()=>sendSatisfactionRequest(m)}>⭐ Rate</button></>}
                   </div>
                 </div>
               </div>
@@ -1307,6 +1324,44 @@ export default function Manager() {
             <div style={{fontSize:11,color:'#555',marginBottom:16}}>{closingMatter.name} · {closingMatter.client}</div>
             <div><label style={lbl}>Closure Notes *</label><textarea className="mb-inp" style={{minHeight:80,resize:'vertical'}} placeholder="Reason for closure, final actions taken..." value={closureForm.closure_notes} onChange={e=>setClosureForm(f=>({...f,closure_notes:e.target.value}))}/></div>
             <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setClosingMatter(null)}>Cancel</button><button style={{...C.btn('r')}} disabled={!closureForm.closure_notes.trim()} onClick={()=>handleCloseMatter(closingMatter)}>Close Matter</button></div>
+          </div>
+        </div>)}
+
+        {/* ── OPPOSING PARTY MODAL ─────────────────────────── */}
+        {showOppForm&&oppMatter&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowOppForm(false)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Opposing Party — {oppMatter.id}</div>
+            <div style={{fontSize:11,color:'#555',marginBottom:16}}>{oppMatter.name} · {oppMatter.client}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div><label style={lbl}>Opposing Party / Respondent</label><input className="mb-inp" value={oppForm.opposing_party} onChange={e=>setOppForm(f=>({...f,opposing_party:e.target.value}))} placeholder="Name of opposing party"/></div>
+              <div><label style={lbl}>Opposing Attorney</label><input className="mb-inp" value={oppForm.opposing_attorney} onChange={e=>setOppForm(f=>({...f,opposing_attorney:e.target.value}))} placeholder="Attorney name"/></div>
+              <div><label style={lbl}>Opposing Firm</label><input className="mb-inp" value={oppForm.opposing_firm} onChange={e=>setOppForm(f=>({...f,opposing_firm:e.target.value}))} placeholder="Law firm name"/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+              <button style={C.btn()} onClick={()=>setShowOppForm(false)}>Cancel</button>
+              <button style={C.btn('p')} onClick={handleSaveOpp}>Save</button>
+            </div>
+          </div>
+        </div>)}
+
+        {/* ── PAYMENT PLAN MODAL ───────────────────────────── */}
+        {showPayPlan&&payPlanInv&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowPayPlan(false)}>
+          <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:440}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Payment Plan — {payPlanInv.id}</div>
+            <div style={{fontSize:11,color:'#555',marginBottom:4}}>{payPlanInv.client} · Total: {fmtR((payPlanInv.total_units||0)*(payPlanInv.rate||150)*1.15)} incl. VAT</div>
+            {payPlanForm.instalment&&(<div style={{fontSize:11,color:'#8DC63F',marginBottom:12}}>≈ {Math.ceil((payPlanInv.total_units||0)*(payPlanInv.rate||150)*1.15/parseFloat(payPlanForm.instalment))} instalments of R{payPlanForm.instalment}</div>)}
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={lbl}>Monthly Instalment (R) *</label><input className="mb-inp" type="number" placeholder="e.g. 2500" value={payPlanForm.instalment} onChange={e=>setPayPlanForm(f=>({...f,instalment:e.target.value}))}/></div>
+                <div><label style={lbl}>Frequency</label><select className="mb-inp" value={payPlanForm.frequency} onChange={e=>setPayPlanForm(f=>({...f,frequency:e.target.value}))}><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select></div>
+              </div>
+              <div><label style={lbl}>Start Date</label><input className="mb-inp" type="date" value={payPlanForm.start_date} onChange={e=>setPayPlanForm(f=>({...f,start_date:e.target.value}))}/></div>
+              <div><label style={lbl}>Notes</label><input className="mb-inp" placeholder="e.g. Agreed telephonically" value={payPlanForm.notes} onChange={e=>setPayPlanForm(f=>({...f,notes:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+              <button style={C.btn()} onClick={()=>setShowPayPlan(false)}>Cancel</button>
+              <button style={C.btn('p')} disabled={savingPlan||!payPlanForm.instalment} onClick={handleSavePayPlan}>{savingPlan?'Saving…':'Create Plan'}</button>
+            </div>
           </div>
         </div>)}
 

@@ -72,6 +72,10 @@ const NAV = {
     { type:'item', label:'Calendar', id:'calendar' },
     { type:'item', label:'Matters', id:'matters' },
   ],
+  hr: [
+    { type:'item', label:'Staff', id:'staff' },
+    { type:'item', label:'Performance', id:'performance' },
+  ],
 };
 
 export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, pendingCount=0, ficaCount=0, rightSlot }) {

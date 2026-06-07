@@ -16,8 +16,9 @@ export default function Settings() {
   const [logoUploading, setLogoUploading] = useState(false);
   const logoRef = useRef(null);
   const [form, setForm] = useState({
-    firm_name:'', logo_url:'', vat_number:'', bank_name:'',
-    bank_account:'', bank_branch:'', address:'', phone:'',
+    firm_name:'', logo_url:'', vat_number:'', lpc_number:'',
+    invoice_prefix:'INV', bank_name:'', bank_account:'',
+    bank_branch:'', address:'', phone:'',
     email:'', website:'', default_rate:150, invoice_footer:''
   });
 
@@ -32,7 +33,8 @@ export default function Settings() {
         setSettingsId(s.id);
         setForm({
           firm_name: s.firm_name||'', logo_url: s.logo_url||'',
-          vat_number: s.vat_number||'', bank_name: s.bank_name||'',
+          vat_number: s.vat_number||'', lpc_number: s.lpc_number||'',
+          invoice_prefix: s.invoice_prefix||'INV', bank_name: s.bank_name||'',
           bank_account: s.bank_account||'', bank_branch: s.bank_branch||'',
           address: s.address||'', phone: s.phone||'', email: s.email||'',
           website: s.website||'', default_rate: s.default_rate||150,
@@ -110,6 +112,14 @@ export default function Settings() {
             <div>
               <label style={lbl}>VAT Registration Number</label>
               <input style={inp} type="text" value={form.vat_number} onChange={e=>setForm(f=>({...f,vat_number:e.target.value}))} placeholder="e.g. 4100000000"/>
+            </div>
+            <div>
+              <label style={lbl}>LPC Practice Number</label>
+              <input style={inp} type="text" value={form.lpc_number} onChange={e=>setForm(f=>({...f,lpc_number:e.target.value}))} placeholder="e.g. LPC123456"/>
+            </div>
+            <div>
+              <label style={lbl}>Invoice Number Prefix</label>
+              <input style={inp} type="text" value={form.invoice_prefix} onChange={e=>setForm(f=>({...f,invoice_prefix:e.target.value}))} placeholder="e.g. INV or MB-INV"/>
             </div>
             <div>
               <label style={lbl}>Default Billing Rate (R per unit)</label>

@@ -151,8 +151,7 @@ export async function fetchInvoices(userId) {
  
 export async function saveInvoice(invoice, userId) {
   try {
-    const ts  = Date.now().toString().slice(-6);
-    const id  = `MB-${ts}-${new Date().getFullYear()}`;
+    const id = await generateInvoiceId();
     const invoiceData = {
       id,
       user_id:      userId,
@@ -616,6 +615,79 @@ export async function checkConflict(clientName) {
   const { data } = await supabase.from('matters').select('id,client,name,user_id').limit(500);
   const conflicts = (data || []).filter(m => m.client && m.client.toLowerCase().includes(q) && m.client.toLowerCase() !== q);
   return { conflicts };
+}
+
+// ── Sequential Invoice Numbering ─────────────────────────────────────
+export async function getNextInvoiceNumber() {
+  const { data, error } = await supabase.rpc('get_next_invoice_number');
+  if (error) {
+    // Fallback if RPC not set up
+    const { data: counter } = await supabase.from('invoice_counter').select('last_no').eq('id', 1).single();
+    const next = (counter?.last_no || 0) + 1;
+    await supabase.from('invoice_counter').update({ last_no: next }).eq('id', 1);
+    return next;
+  }
+  return data;
+}
+
+export async function generateInvoiceId(prefix = 'INV') {
+  const { data: settings } = await supabase.from('firm_settings').select('invoice_prefix').limit(1).single();
+  const pfx = settings?.invoice_prefix || prefix;
+  const { data: counter } = await supabase.from('invoice_counter').select('last_no').eq('id', 1).single();
+  const next = (counter?.last_no || 0) + 1;
+  await supabase.from('invoice_counter').update({ last_no: next }).eq('id', 1);
+  return `${pfx}-${String(next).padStart(4, '0')}`;
+}
+
+// ── Payment Plans ─────────────────────────────────────────────────────
+export async function fetchPaymentPlans({ invoiceId, clientId } = {}) {
+  let q = supabase.from('payment_plans').select('*, payment_plan_instalments(*)').order('created_at', { ascending: false });
+  if (invoiceId) q = q.eq('invoice_id', invoiceId);
+  if (clientId)  q = q.eq('client_id', clientId);
+  const { data, error } = await q;
+  if (error) console.error('fetchPaymentPlans:', error.message);
+  return { plans: data || [] };
+}
+
+export async function savePaymentPlan(plan, userId) {
+  const { data, error } = await supabase.from('payment_plans').insert([{ ...plan, created_by: userId }]).select();
+  if (error) console.error('savePaymentPlan:', error.message);
+  if (data?.[0] && plan.instalments?.length) {
+    await supabase.from('payment_plan_instalments').insert(plan.instalments.map(i => ({ ...i, plan_id: data[0].id })));
+  }
+  return { data: data?.[0], error };
+}
+
+export async function updateInstalment(id, updates) {
+  const { error } = await supabase.from('payment_plan_instalments').update(updates).eq('id', id);
+  if (error) console.error('updateInstalment:', error.message);
+  return { error };
+}
+
+// ── 360 Feedback ──────────────────────────────────────────────────────
+export async function fetchFeedback360({ subjectId, period } = {}) {
+  let q = supabase.from('feedback_360').select('*, profiles!feedback_360_reviewer_id_fkey(full_name, role)').order('created_at', { ascending: false });
+  if (subjectId) q = q.eq('subject_id', subjectId);
+  if (period)    q = q.eq('period', period);
+  const { data, error } = await q;
+  if (error) console.error('fetchFeedback360:', error.message);
+  return { feedback: data || [] };
+}
+
+export async function saveFeedback360(fb) {
+  const { data, error } = await supabase.from('feedback_360').insert([fb]).select();
+  if (error) console.error('saveFeedback360:', error.message);
+  return { data: data?.[0], error };
+}
+
+// ── Client Satisfaction ───────────────────────────────────────────────
+export async function fetchClientSatisfaction({ matterId, attorneyId } = {}) {
+  let q = supabase.from('client_satisfaction').select('*').order('created_at', { ascending: false });
+  if (matterId)   q = q.eq('matter_id', matterId);
+  if (attorneyId) q = q.eq('attorney_id', attorneyId);
+  const { data, error } = await q;
+  if (error) console.error('fetchClientSatisfaction:', error.message);
+  return { ratings: data || [] };
 }
 
 // ── Search ────────────────────────────────────────────────────────────
