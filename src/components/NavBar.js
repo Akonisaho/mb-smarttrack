@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useFirmSettings } from '../lib/useFirmSettings';
+import { useOffline } from '../lib/useOffline';
 
 const NAV = {
   manager: [
@@ -81,6 +82,7 @@ const NAV = {
 export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, pendingCount=0, ficaCount=0, rightSlot }) {
   const firm = useFirmSettings();
   const router = useRouter();
+  const isOnline = useOffline();
   const [openGroup, setOpenGroup] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -168,6 +170,13 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
 
   return (
     <>
+      {!isOnline && (
+        <div style={{ background:'#7F1D1D', borderBottom:'1px solid #991B1B', padding:'8px 20px', display:'flex', alignItems:'center', justifyContent:'center', gap:10, fontSize:12, color:'#FEE2E2', position:'sticky', top:0, zIndex:201 }}>
+          <span>⚡</span>
+          <strong>You are offline</strong>
+          <span style={{ color:'#FCA5A5' }}>— changes will sync when your connection is restored. Data shown is from your last session.</span>
+        </div>
+      )}
       <div style={S.hdr} ref={headerRef}>
         {/* LOGO */}
         <div style={S.logo}>
