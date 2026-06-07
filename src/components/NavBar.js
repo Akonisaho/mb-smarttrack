@@ -37,6 +37,7 @@ const NAV = {
     ]},
     { type:'group', label:'Admin', items:[
       { label:'Staff', id:'staff' },
+      { label:'Campaigns', id:'campaigns' },
       { label:'Court Roll', id:'courtroll' },
       { label:'Audit Log', id:'audit' },
       { label:'Settings', id:'settings' },
@@ -76,6 +77,8 @@ const NAV = {
   hr: [
     { type:'item', label:'Staff', id:'staff' },
     { type:'item', label:'Performance', id:'performance' },
+    { type:'item', label:'Leave', id:'leave' },
+    { type:'item', label:'Payroll', id:'payroll' },
   ],
 };
 

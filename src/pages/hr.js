@@ -32,6 +32,14 @@ export default function HRDashboard() {
   const [savingFb, setSavingFb] = useState(false);
   const [alert, setAlert] = useState({ msg:'', type:'' });
   const [editingTitle, setEditingTitle] = useState({});
+  // Leave management
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ staff_id:'', type:'annual', from_date:'', to_date:'', reason:'' });
+  const [savingLeave, setSavingLeave] = useState(false);
+  const [leaveFilter, setLeaveFilter] = useState('all');
+  // Payroll
+  const [payMonth, setPayMonth] = useState(new Date().toLocaleDateString('en-CA').substring(0,7));
 
   function showMsg(msg, type='success') { setAlert({ msg, type }); setTimeout(() => setAlert({ msg:'', type:'' }), 5000); }
 
@@ -64,6 +72,9 @@ export default function HRDashboard() {
 
     const { data: sat } = await supabase.from('client_satisfaction').select('*').eq('submitted', true);
     setSatisfaction(sat || []);
+
+    const { data: lv } = await supabase.from('leave_requests').select('*, profiles!leave_requests_staff_id_fkey(full_name,role,branch_id)').order('created_at', { ascending:false });
+    setLeaveRequests(lv || []);
   }, []);
 
   useEffect(() => { if (!loading) load(); }, [loading, load]);
@@ -86,6 +97,34 @@ export default function HRDashboard() {
     const avgOverall = attyFb.length ? (attyFb.reduce((s, f) => s + (f.overall_score || 0), 0) / attyFb.length).toFixed(1) : null;
     const avgSat = attyRatings.length ? (attyRatings.reduce((s, r) => s + r.rating, 0) / attyRatings.length).toFixed(1) : null;
     return { units, billSec, totalSec, invAmt, tgt, pct, util, attyFb, avgOverall, avgSat, attyRatings };
+  }
+
+  async function handleSaveLeave() {
+    if (!leaveForm.staff_id || !leaveForm.from_date || !leaveForm.to_date) { showMsg('Fill in all required fields.', 'error'); return; }
+    const days = Math.max(1, Math.round((new Date(leaveForm.to_date) - new Date(leaveForm.from_date)) / 86400000) + 1);
+    setSavingLeave(true);
+    const { error } = await supabase.from('leave_requests').insert([{ ...leaveForm, days, status:'pending', submitted_by: profile.id }]);
+    setSavingLeave(false);
+    if (error) { showMsg('Error: ' + error.message, 'error'); return; }
+    showMsg('✓ Leave request submitted.');
+    setShowLeaveForm(false);
+    setLeaveForm({ staff_id:'', type:'annual', from_date:'', to_date:'', reason:'' });
+    load();
+  }
+
+  async function handleLeaveAction(id, action) {
+    const { error } = await supabase.from('leave_requests').update({ status: action, reviewed_by: profile.id, reviewed_at: new Date().toISOString() }).eq('id', id);
+    if (error) { showMsg('Error: ' + error.message, 'error'); return; }
+    showMsg(`✓ Leave request ${action}.`);
+    load();
+  }
+
+  function exportPayrollCSV(rows) {
+    const hdr = 'Name,Role,Branch,Rate,Units,Billable Time,Gross Pay (excl VAT)';
+    const lines = rows.map(r => `"${r.name}","${r.role}","${r.branch}",${r.rate},${r.units},"${r.time}",${r.gross.toFixed(2)}`);
+    const blob = new Blob([hdr + '\n' + lines.join('\n')], { type:'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `payroll_${payMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   }
 
   async function saveTitle(userId, title) {
@@ -228,6 +267,94 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
         })}
       </div>)}
 
+      {/* ── LEAVE TAB ── */}
+      {tab==='leave' && (() => {
+        const LEAVE_TYPES = ['annual','sick','unpaid','study','maternity','paternity','family_responsibility'];
+        const LEAVE_COLORS = { annual:'#8DC63F', sick:'#E05252', unpaid:'#555', study:'#4A90D9', maternity:'#F472B6', paternity:'#A78BFA', family_responsibility:'#EAB308' };
+        const filtered = leaveFilter==='all' ? leaveRequests : leaveRequests.filter(l=>l.status===leaveFilter);
+        const summary = profiles.map(p => {
+          const taken = leaveRequests.filter(l=>l.staff_id===p.id&&l.status==='approved');
+          return { ...p, annual: taken.filter(l=>l.type==='annual').reduce((s,l)=>s+(l.days||0),0), sick: taken.filter(l=>l.type==='sick').reduce((s,l)=>s+(l.days||0),0) };
+        }).filter(p=>p.annual>0||p.sick>0);
+        return (<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Leave Management</div><div style={{fontSize:11,color:'#444'}}>{leaveRequests.filter(l=>l.status==='pending').length} pending · {leaveRequests.filter(l=>l.status==='approved').length} approved</div></div>
+            <div style={{display:'flex',gap:8}}>
+              {['all','pending','approved','rejected'].map(s=><button key={s} style={{...C.btn(),fontSize:11,background:leaveFilter===s?'#1A1A1A':'transparent',color:leaveFilter===s?'#F0F0F0':'#555',textTransform:'capitalize'}} onClick={()=>setLeaveFilter(s)}>{s}</button>)}
+              <button style={C.btn('p')} onClick={()=>setShowLeaveForm(true)}>+ Request Leave</button>
+            </div>
+          </div>
+          {summary.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:10}}>Days Taken (approved)</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{summary.map(p=>(<div key={p.id} style={{background:'#0D0D0D',borderRadius:6,padding:'8px 12px',fontSize:11}}><div style={{fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{p.full_name}</div><div style={{display:'flex',gap:12}}><span style={{color:'#8DC63F'}}>Annual: {p.annual}d</span><span style={{color:'#E05252'}}>Sick: {p.sick}d</span></div></div>))}</div></div>)}
+          <div style={C.card}>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>{['Staff Member','Type','From','To','Days','Reason','Status','Actions'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {!filtered.length&&<tr><td colSpan={8} style={{...C.td,textAlign:'center',color:'#333',padding:30}}>No leave requests{leaveFilter!=='all'?` with status "${leaveFilter}"`:''}</td></tr>}
+                {filtered.map(l=>{
+                  const typeColor=LEAVE_COLORS[l.type]||'#555';
+                  return(<tr key={l.id}>
+                    <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{l.profiles?.full_name||'—'}</td>
+                    <td style={C.td}><span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:`${typeColor}15`,color:typeColor,textTransform:'capitalize'}}>{l.type?.replace(/_/g,' ')}</span></td>
+                    <td style={{...C.td,fontFamily:'monospace',fontSize:10}}>{l.from_date}</td>
+                    <td style={{...C.td,fontFamily:'monospace',fontSize:10}}>{l.to_date}</td>
+                    <td style={{...C.td,fontWeight:700,color:'#EAB308'}}>{l.days}d</td>
+                    <td style={{...C.td,color:'#666',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.reason||'—'}</td>
+                    <td style={C.td}><span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:l.status==='approved'?'rgba(141,198,63,0.1)':l.status==='rejected'?'rgba(220,80,80,0.1)':'rgba(234,179,8,0.1)',color:l.status==='approved'?'#8DC63F':l.status==='rejected'?'#E05252':'#EAB308',textTransform:'capitalize'}}>{l.status}</span></td>
+                    <td style={C.td}>{l.status==='pending'&&(<div style={{display:'flex',gap:4}}><button style={{...C.btn('p'),fontSize:10,padding:'3px 10px'}} onClick={()=>handleLeaveAction(l.id,'approved')}>Approve</button><button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>handleLeaveAction(l.id,'rejected')}>Reject</button></div>)}</td>
+                  </tr>);
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>);
+      })()}
+
+      {/* ── PAYROLL TAB ── */}
+      {tab==='payroll' && (() => {
+        const payActs = allTime.filter(a => a.date?.startsWith(payMonth) && a.is_billable);
+        const rows = profiles.map(p => {
+          const acts = payActs.filter(a => a.user_id === p.id);
+          const units = acts.reduce((s,a) => s+(a.billing_units||0), 0);
+          const secs = acts.reduce((s,a) => s+(a.duration_seconds||0), 0);
+          const rate = p.rate || 150;
+          const gross = units * rate;
+          const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60);
+          const br = branches.find(b=>b.id===p.branch_id);
+          return { id:p.id, name:p.full_name, role:p.role, branch:br?.name||'—', rate, units, time: h>0?`${h}h ${m}m`:`${m}m`, gross };
+        }).filter(r => r.units > 0 || true);
+        const totalGross = rows.reduce((s,r)=>s+r.gross, 0);
+        return (<div style={C.main}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Payroll Summary</div><div style={{fontSize:11,color:'#444'}}>{rows.filter(r=>r.units>0).length} billing staff · {payMonth}</div></div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input type="month" style={{...C.sel,padding:'6px 10px'}} value={payMonth} onChange={e=>setPayMonth(e.target.value)}/>
+              <button style={C.btn('p')} onClick={()=>exportPayrollCSV(rows)}>↓ Export CSV</button>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {[{l:'Total Staff',v:rows.length},{l:'Active Billers',v:rows.filter(r=>r.units>0).length,a:true},{l:'Total Units',v:rows.reduce((s,r)=>s+r.units,0),a:true},{l:'Gross Billing',v:fmtR(totalGross),a:true}].map(({l,v,a})=>(<div key={l} style={C.stat(a,false)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:20,fontWeight:800,color:a?'#8DC63F':'#F0F0F0'}}>{v}</div></div>))}
+          </div>
+          <div style={C.card}>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>{['Name','Role','Branch','Rate/unit','Units','Billable Time','Gross (excl VAT)'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {rows.map(r=>(<tr key={r.id} style={{opacity:r.units===0?0.4:1}}>
+                  <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{r.name}</td>
+                  <td style={C.td}><span style={{fontSize:10,padding:'1px 8px',borderRadius:20,background:'rgba(141,198,63,0.08)',color:roleColor(r.role)}}>{r.role}</span></td>
+                  <td style={{...C.td,color:'#4A90D9',fontSize:10}}>{r.branch}</td>
+                  <td style={{...C.td,fontFamily:'monospace',color:'#555'}}>R{r.rate}</td>
+                  <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:r.units>0?'#F0F0F0':'#333'}}>{r.units}</td>
+                  <td style={{...C.td,color:'#555'}}>{r.time}</td>
+                  <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>{fmtR(r.gross)}</td>
+                </tr>))}
+                <tr style={{borderTop:'2px solid #1A1A1A'}}><td colSpan={6} style={{...C.td,fontWeight:700,color:'#D0D0D0',textAlign:'right'}}>Total</td><td style={{...C.td,fontFamily:'monospace',fontWeight:800,color:'#8DC63F',fontSize:13}}>{fmtR(totalGross)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{fontSize:10,color:'#333',marginTop:8}}>* Gross billing = units × hourly rate. Does not include fixed-fee matters or disbursements. Export to CSV for further processing.</div>
+        </div>);
+      })()}
+
       {/* ── FEEDBACK FORM MODAL ── */}
       {showFeedbackForm && (<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowFeedbackForm(false)}>
         <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:500}} onClick={e=>e.stopPropagation()}>
@@ -248,6 +375,27 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
           <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
             <button style={C.btn()} onClick={()=>setShowFeedbackForm(false)}>Cancel</button>
             <button style={C.btn('p')} disabled={savingFb||!fbForm.subject_id||!fbForm.overall_score} onClick={handleSaveFeedback}>{savingFb?'Saving…':'Submit Feedback'}</button>
+          </div>
+        </div>
+      </div>)}
+
+      {/* ── LEAVE REQUEST FORM MODAL ── */}
+      {showLeaveForm && (<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowLeaveForm(false)}>
+        <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:440}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>Submit Leave Request</div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div><label style={C.lbl}>Staff Member *</label><select style={C.inp} value={leaveForm.staff_id} onChange={e=>setLeaveForm(f=>({...f,staff_id:e.target.value}))}><option value="">— Select staff —</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></div>
+            <div><label style={C.lbl}>Leave Type *</label><select style={C.inp} value={leaveForm.type} onChange={e=>setLeaveForm(f=>({...f,type:e.target.value}))}>{['annual','sick','unpaid','study','maternity','paternity','family_responsibility'].map(t=><option key={t} value={t} style={{textTransform:'capitalize'}}>{t.replace(/_/g,' ')}</option>)}</select></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <div><label style={C.lbl}>From Date *</label><input type="date" style={C.inp} value={leaveForm.from_date} onChange={e=>setLeaveForm(f=>({...f,from_date:e.target.value}))}/></div>
+              <div><label style={C.lbl}>To Date *</label><input type="date" style={C.inp} value={leaveForm.to_date} onChange={e=>setLeaveForm(f=>({...f,to_date:e.target.value}))}/></div>
+            </div>
+            {leaveForm.from_date&&leaveForm.to_date&&<div style={{fontSize:11,color:'#EAB308',textAlign:'center'}}>Duration: {Math.max(1,Math.round((new Date(leaveForm.to_date)-new Date(leaveForm.from_date))/86400000)+1)} day(s)</div>}
+            <div><label style={C.lbl}>Reason / Notes</label><textarea style={{...C.inp,minHeight:60}} value={leaveForm.reason} onChange={e=>setLeaveForm(f=>({...f,reason:e.target.value}))} placeholder="Optional reason or medical reference..."/></div>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+            <button style={C.btn()} onClick={()=>setShowLeaveForm(false)}>Cancel</button>
+            <button style={C.btn('p')} disabled={savingLeave} onClick={handleSaveLeave}>{savingLeave?'Submitting…':'Submit'}</button>
           </div>
         </div>
       </div>)}

@@ -108,6 +108,12 @@ export default function Manager() {
   const [oppMatter,setOppMatter]           = useState(null);
   const [oppForm,setOppForm]               = useState({opposing_party:'',opposing_attorney:'',opposing_firm:''});
   const [appUrl]                           = useState(typeof window!=='undefined'?window.location.origin:'');
+  const [campSubject,setCampSubject]       = useState('');
+  const [campBody,setCampBody]             = useState('');
+  const [campRecip,setCampRecip]           = useState('all');
+  const [campMatter,setCampMatter]         = useState('');
+  const [campSending,setCampSending]       = useState(false);
+  const [campResult,setCampResult]         = useState(null);
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -1077,6 +1083,36 @@ export default function Manager() {
             </tr>))}
           </tbody></table></div>}
         </div>)}
+
+        {/* ── CAMPAIGNS TAB ────────────────────────────────── */}
+        {tab==='campaigns'&&(<div style={C.main}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+              <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Client Campaigns</div><div style={{fontSize:11,color:'#444'}}>Send bulk emails to clients — overdue notices, newsletters, announcements</div></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+              <div style={C.card}>
+                <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:14}}>Compose Campaign</div>
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                  <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Recipients</label>
+                    <select style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'8px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} value={campRecip} onChange={e=>setCampRecip(e.target.value)}>
+                      <option value="all">All active clients</option>
+                      <option value="overdue">Clients with overdue invoices</option>
+                      <option value="matter">Specific matter clients</option>
+                    </select>
+                  </div>
+                  {campRecip==='matter'&&(<div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Matter</label><select style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'8px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%'}} value={campMatter} onChange={e=>setCampMatter(e.target.value)}><option value="">— Select matter —</option>{matters.map(m=><option key={m.id} value={m.id}>{m.id} · {m.client}</option>)}</select></div>)}
+                  <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Subject *</label><input style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'8px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',boxSizing:'border-box'}} type="text" placeholder="e.g. Important update regarding your matter" value={campSubject} onChange={e=>setCampSubject(e.target.value)}/></div>
+                  <div><label style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4,display:'block'}}>Message Body *</label><textarea style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'8px 12px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',boxSizing:'border-box',minHeight:160,resize:'vertical'}} placeholder="Write your message here. Each line becomes a paragraph." value={campBody} onChange={e=>setCampBody(e.target.value)}/></div>
+                  <button style={{...C.btn('p'),opacity:campSending?0.6:1}} disabled={campSending} onClick={async()=>{ if(!campSubject.trim()||!campBody.trim()){showAlert('Subject and body are required.','error');return;} setCampSending(true);setCampResult(null); const r=await fetch('/api/send-campaign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:campSubject,body:campBody,recipientType:campRecip,matterId:campMatter})}); const d=await r.json(); setCampSending(false);setCampResult(d); if(r.ok){showAlert(d.message||`✓ Sent to ${d.sent} client(s).`);}else{showAlert('Error: '+(d.error||'Failed'),'error');} }}>{campSending?'Sending…':'Send Campaign'}</button>
+                  {campResult&&<div style={{background:campResult.error?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.08)',border:`1px solid ${campResult.error?'rgba(220,80,80,0.3)':'rgba(141,198,63,0.25)'}`,borderRadius:6,padding:'10px 14px',fontSize:12,color:campResult.error?'#E05252':'#8DC63F'}}>{campResult.message||campResult.error}</div>}
+                </div>
+              </div>
+              <div style={C.card}>
+                <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:14}}>Quick Templates</div>
+                {[{t:'Overdue Notice',s:'Outstanding invoice reminder — action required',b:'We wish to draw your attention to an outstanding invoice on your account that is now overdue.\n\nPlease make payment at your earliest convenience to avoid further action. If you have already made payment, please disregard this notice.\n\nShould you wish to discuss a payment arrangement, please contact our offices.'},{t:'Matter Update',s:'Update on your legal matter',b:'We would like to provide you with an update on your matter currently in our care.\n\nPlease contact our offices at your earliest convenience to discuss the progress and next steps.\n\nWe remain committed to resolving your matter efficiently.'},{t:'FICA Reminder',s:'FICA documentation required — urgent',b:'In terms of the Financial Intelligence Centre Act (FICA), we are required to obtain and verify your identification documents.\n\nPlease bring a certified copy of your ID and proof of residence to our offices or reply to this email with the required documents at your earliest convenience.\n\nFailure to provide these documents may result in us being unable to continue acting on your behalf.'}].map(({t,s,b})=>(<div key={t} style={{borderBottom:'1px solid #1A1A1A',paddingBottom:12,marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#C8C8C8',marginBottom:4}}>{t}</div><div style={{fontSize:11,color:'#555',marginBottom:8,lineHeight:1.4}}>{s}</div><button style={{...C.btn(),fontSize:11}} onClick={()=>{setCampSubject(s);setCampBody(b);}}>Use this template →</button></div>))}
+              </div>
+            </div>
+          </div>)}
 
         {/* ── FIRM PERFORMANCE TAB ─────────────────────────── */}
         {tab==='firmperformance'&&(<div style={C.main}>
