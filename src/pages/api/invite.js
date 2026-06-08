@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { email, fullName, role, branchId, inviterRole } = req.body;
+  const { email, fullName, role, title, branchId, inviterRole } = req.body;
   if (!email || !fullName || !branchId) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
       full_name: fullName,
       email,
       role: role || 'attorney',
+      title: title || null,
       branch_id: branchId,
       firm: firmName,
       password_changed: false,

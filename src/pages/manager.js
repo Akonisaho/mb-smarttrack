@@ -68,7 +68,7 @@ export default function Manager() {
   const [schedForm,setSchedForm]         = useState({name:'',unit_rate:150,description:'',is_default:false});
   const [showSchedForm,setShowSchedForm] = useState(false);
   const [showInvite,setShowInvite]       = useState(false);
-  const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',branchId:''});
+  const [inviteForm,setInviteForm]       = useState({fullName:'',email:'',role:'attorney',title:'',branchId:''});
   const [inviting,setInviting]           = useState(false);
   const [inviteMsg,setInviteMsg]         = useState({msg:'',type:''});
   const rate = 150;
@@ -114,6 +114,7 @@ export default function Manager() {
   const [campMatter,setCampMatter]         = useState('');
   const [campSending,setCampSending]       = useState(false);
   const [campResult,setCampResult]         = useState(null);
+  const [editingTitle,setEditingTitle]     = useState({});
 
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})),1000);
@@ -276,6 +277,7 @@ export default function Manager() {
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
+  async function saveTitle(userId,title){ await supabase.from('profiles').update({title}).eq('id',userId); setProfiles(prev=>prev.map(p=>p.id===userId?{...p,title}:p)); setEditingTitle(prev=>({...prev,[userId]:false})); showAlert('✓ Title updated.'); }
   async function removeStaff(userId,name){ if(!confirm(`Remove ${name} from the system? This cannot be undone.`)) return; const res=await fetch('/api/remove-staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})}); const data=await res.json(); if(!res.ok){showAlert('Error: '+data.error,'error');return;} showAlert(`✓ ${name} removed.`,'success'); load(); }
 
   async function handleInvite(){
@@ -294,7 +296,7 @@ export default function Manager() {
     showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Login details emailed to ${inviteForm.email}. Temporary password: ${tempPassword} — shown here as backup.`,'success');
     setInviting(false);
     setShowInvite(false);
-    setInviteForm({fullName:'',email:'',role:'attorney',branchId:branches[0]?.id||''});
+    setInviteForm({fullName:'',email:'',role:'attorney',title:'',branchId:branches[0]?.id||''});
     load();
   }
 
@@ -858,7 +860,7 @@ export default function Manager() {
           </div>
           <div style={C.card}>
             <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All staff</div>
-            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Name','Email','Role','Branch','Change Branch','Rate (R)','Monthly Target (units)','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!profiles.length&&<tr><td colSpan={8} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet</td></tr>}{profiles.map(p=>{ const br=branches.find(b=>b.id===p.branch_id); return(<tr key={p.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}</td><td style={{...C.td,fontSize:10,color:'#555'}}>{p.email||'—'}</td><td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td><td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td><td style={C.td}><select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}><option value="">— select —</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></td><td style={C.td}><input type="number" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.rate||150} onBlur={async e=>{ const rate=parseFloat(e.target.value)||150; await supabase.from('profiles').update({rate}).eq('id',p.id); showAlert(`✓ Rate updated for ${p.full_name}`,'success'); }}/></td><td style={C.td}><input type="number" min="0" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.monthly_target||0} onBlur={async e=>{ const target=parseInt(e.target.value)||0; await supabase.from('profiles').update({monthly_target:target}).eq('id',p.id); showAlert(`✓ Target updated for ${p.full_name}`,'success'); }} placeholder="0"/></td><td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button></td></tr>); })}</tbody></table></div>
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Name','Title','Role','Branch','Change Branch','Rate (R)','Monthly Target (units)','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!profiles.length&&<tr><td colSpan={8} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet</td></tr>}{profiles.map(p=>{ const br=branches.find(b=>b.id===p.branch_id); return(<tr key={p.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}<div style={{fontSize:10,color:'#555'}}>{p.email||'—'}</div></td><td style={C.td}>{editingTitle[p.id]?(<input autoFocus type="text" defaultValue={p.title||''} placeholder="e.g. Senior Attorney" style={{background:'#1A1A1A',border:'1px solid #4A90D9',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:160,fontFamily:'inherit'}} onBlur={e=>saveTitle(p.id,e.target.value)} onKeyDown={e=>{if(e.key==='Enter')e.target.blur();if(e.key==='Escape')setEditingTitle(prev=>({...prev,[p.id]:false}));}}/>) :(<span style={{fontSize:11,color:p.title?'#C8C8C8':'#4A90D9',cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}} onClick={()=>setEditingTitle(prev=>({...prev,[p.id]:true}))} title="Click to edit">{p.title||'Set title'}</span>)}</td><td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td><td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td><td style={C.td}><select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}><option value="">— select —</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></td><td style={C.td}><input type="number" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.rate||150} onBlur={async e=>{ const rate=parseFloat(e.target.value)||150; await supabase.from('profiles').update({rate}).eq('id',p.id); showAlert(`✓ Rate updated for ${p.full_name}`,'success'); }}/></td><td style={C.td}><input type="number" min="0" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.monthly_target||0} onBlur={async e=>{ const target=parseInt(e.target.value)||0; await supabase.from('profiles').update({monthly_target:target}).eq('id',p.id); showAlert(`✓ Target updated for ${p.full_name}`,'success'); }} placeholder="0"/></td><td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button></td></tr>); })}</tbody></table></div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
             {branches.map(b=>{ const bStaff=profiles.filter(p=>p.branch_id===b.id); return(<div key={b.id} style={C.card}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{b.name}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>{b.address}</div><div style={{fontSize:22,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{bStaff.length}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>staff members</div><div style={{display:'flex',flexDirection:'column',gap:4}}>{bStaff.map(s=>(<div key={s.id} style={{fontSize:11,color:'#888',display:'flex',alignItems:'center',gap:6}}><span style={{width:6,height:6,borderRadius:'50%',background:roleColor(s.role),display:'inline-block',flexShrink:0}}/><span>{s.full_name}</span><span style={{fontSize:9,color:'#444'}}>({s.role||'attorney'})</span></div>))}{!bStaff.length&&<div style={{fontSize:11,color:'#333'}}>No staff assigned</div>}</div></div>); })}
@@ -873,8 +875,21 @@ export default function Manager() {
               <div><label style={lbl}>Full name *</label><input className="mb-inp" type="text" placeholder="e.g. Adv. Sarah Nkosi" value={inviteForm.fullName} onChange={e=>setInviteForm(f=>({...f,fullName:e.target.value}))}/></div>
               <div><label style={lbl}>Email address *</label><input className="mb-inp" type="email" placeholder="their@email.com" value={inviteForm.email} onChange={e=>setInviteForm(f=>({...f,email:e.target.value}))}/></div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div><label style={lbl}>Role *</label><select className="mb-inp" value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value}))}><option value="attorney">Attorney / Fee Earner</option>{!isBranchManager&&<option value="branch_manager">Branch Manager</option>}{!isBranchManager&&<option value="manager">National Manager</option>}{!isBranchManager&&<option value="hr">HR</option>}<option value="bookkeeper">Bookkeeper</option><option value="receptionist">Receptionist</option></select></div>
+                <div><label style={lbl}>System Role *</label><select className="mb-inp" value={inviteForm.role} onChange={e=>setInviteForm(f=>({...f,role:e.target.value,title:''}))}><option value="attorney">Attorney / Fee Earner</option>{!isBranchManager&&<option value="branch_manager">Branch Manager</option>}{!isBranchManager&&<option value="manager">National Manager</option>}{!isBranchManager&&<option value="hr">HR</option>}<option value="bookkeeper">Bookkeeper</option><option value="receptionist">Receptionist</option></select></div>
                 <div><label style={lbl}>Branch *</label><select className="mb-inp" value={inviteForm.branchId} onChange={e=>setInviteForm(f=>({...f,branchId:e.target.value}))}><option value="">Select branch...</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+              </div>
+              <div>
+                <label style={lbl}>Professional Title</label>
+                <input className="mb-inp" type="text"
+                  placeholder={
+                    ['attorney','branch_manager','manager'].includes(inviteForm.role) ? 'e.g. Senior Attorney, Partner, Candidate Attorney…' :
+                    inviteForm.role==='bookkeeper' ? 'e.g. Senior Bookkeeper, Accounts Clerk…' :
+                    inviteForm.role==='receptionist' ? 'e.g. Office Manager, Receptionist…' :
+                    inviteForm.role==='hr' ? 'e.g. HR Manager, HR Officer…' : 'Enter title…'
+                  }
+                  value={inviteForm.title}
+                  onChange={e=>setInviteForm(f=>({...f,title:e.target.value}))}
+                />
               </div>
               {inviteMsg.msg&&(<div style={{background:inviteMsg.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${inviteMsg.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,borderRadius:6,padding:'10px 12px',fontSize:12,color:inviteMsg.type==='error'?'#E05252':'#8DC63F'}}>{inviteMsg.msg}</div>)}
               <div style={{display:'flex',gap:10,marginTop:8,justifyContent:'flex-end'}}>

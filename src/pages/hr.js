@@ -199,11 +199,13 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
                   <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{p.full_name}</td>
                   <td style={C.td}>
                     {editingTitle[p.id] ? (
-                      <select style={{...C.sel,fontSize:10}} defaultValue={p.title||''} onBlur={e=>saveTitle(p.id,e.target.value)} autoFocus>
-                        {TITLES.map(t=><option key={t} value={t}>{t||'— Set title —'}</option>)}
-                      </select>
+                      <input autoFocus type="text" defaultValue={p.title||''} placeholder="e.g. Senior Attorney"
+                        style={{...C.sel,fontSize:10,width:160}}
+                        onBlur={e=>saveTitle(p.id,e.target.value)}
+                        onKeyDown={e=>{if(e.key==='Enter')e.target.blur();if(e.key==='Escape')setEditingTitle(prev=>({...prev,[p.id]:false}));}}
+                      />
                     ) : (
-                      <span style={{fontSize:10,color:p.title?'#C8C8C8':'#333',cursor:'pointer'}} onClick={()=>setEditingTitle(prev=>({...prev,[p.id]:true}))}>{p.title||'Click to set'}</span>
+                      <span style={{fontSize:10,color:p.title?'#C8C8C8':'#4A90D9',cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}} onClick={()=>setEditingTitle(prev=>({...prev,[p.id]:true}))}>{p.title||'Click to set'}</span>
                     )}
                   </td>
                   <td style={C.td}><span style={{fontSize:9,padding:'1px 8px',borderRadius:20,background:'rgba(141,198,63,0.08)',color:roleColor(p.role),fontWeight:600}}>{p.role}</span></td>
