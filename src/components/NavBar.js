@@ -186,7 +186,7 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
           <img src={firm.logo_url || '/logo.png'} alt="MB" style={{width:44,height:44,objectFit:'contain',borderRadius:6,flexShrink:0}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="width:44px;height:44px;background:#8DC63F;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
 
           <div style={{lineHeight:1.5}}>
-            <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em'}}>MB SmartTrack</div>
+            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>MB Smart</span><span style={{color:'#8DC63F'}}>Track</span></div>
             <div style={{fontSize:11,color:'#555',textTransform:'uppercase',letterSpacing:'0.08em'}}>{profile?.full_name}</div>
           </div>
         </div>
