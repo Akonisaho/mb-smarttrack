@@ -167,7 +167,7 @@ export default function Sidebar({ role, tab, setTab, onSignOut, profile, pending
         {collapsed
           ? <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:28,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:28px;padding:0 5px;background:#8DC63F;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
           : <div style={{flex:1,minWidth:0}}>
-              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+              <div style={{display:'flex',alignItems:'center',gap:1,marginBottom:3}}>
                 <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:26,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:26px;padding:0 5px;background:#8DC63F;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
                 <span style={{fontSize:15,fontWeight:700,letterSpacing:'-0.02em',whiteSpace:'nowrap'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
               </div>
