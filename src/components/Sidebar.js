@@ -164,9 +164,16 @@ export default function Sidebar({ role, tab, setTab, onSignOut, profile, pending
     <div style={S.sidebar}>
       {/* LOGO */}
       <div style={S.logo}>
-        <img src={firm.logo_url || '/logo.png'} alt="MB" style={{width:32,height:32,objectFit:'contain',borderRadius:6,flexShrink:0}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="width:32px;height:32px;background:#8DC63F;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
-
-        {!collapsed&&<div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{firm.firm_name||'MB SmartTrack'}</div><div style={{fontSize:9,color:'#333',textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{profile?.full_name}</div></div>}
+        {collapsed
+          ? <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:28,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:28px;padding:0 5px;background:#8DC63F;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
+          : <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:26,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:26px;padding:0 5px;background:#8DC63F;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
+                <span style={{fontSize:15,fontWeight:700,letterSpacing:'-0.02em',whiteSpace:'nowrap'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
+              </div>
+              <div style={{fontSize:9,color:'#333',textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{profile?.full_name}</div>
+            </div>
+        }
         {!isMobile&&<button style={{background:'none',border:'none',color:'#333',cursor:'pointer',fontSize:14,padding:4,flexShrink:0,marginLeft:'auto'}} onClick={()=>setCollapsed(c=>!c)}>{collapsed?'→':'←'}</button>}
         {isMobile&&<button style={{background:'none',border:'none',color:'#333',cursor:'pointer',fontSize:18,padding:4,flexShrink:0,marginLeft:'auto'}} onClick={()=>setMobileOpen(false)}>✕</button>}
       </div>
