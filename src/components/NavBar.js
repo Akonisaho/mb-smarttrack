@@ -183,10 +183,8 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
       <div style={S.hdr} ref={headerRef}>
         {/* LOGO */}
         <div style={S.logo}>
-          {firm.logo_url
-            ? <img src={firm.logo_url} alt="" style={{width:34,height:34,objectFit:'contain',borderRadius:6}}/>
-            : <div style={{width:34,height:34,background:'#8DC63F',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13,color:'#0A0A0A',flexShrink:0}}>MB</div>
-          }
+          <img src={firm.logo_url || '/logo.png'} alt="MB" style={{width:34,height:34,objectFit:'contain',borderRadius:6,flexShrink:0}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="width:34px;height:34px;background:#8DC63F;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
+
           <div style={{lineHeight:1.4}}>
             <div style={{fontSize:14,fontWeight:700,color:'#F0F0F0',letterSpacing:'-0.02em'}}>MB SmartTrack</div>
             <div style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'0.08em'}}>{profile?.full_name}</div>
