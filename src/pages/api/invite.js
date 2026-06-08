@@ -7,9 +7,14 @@ const supabaseAdmin = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { email, fullName, role, branchId } = req.body;
+  const { email, fullName, role, branchId, inviterRole } = req.body;
   if (!email || !fullName || !branchId) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+  // Branch managers can only create attorneys, bookkeepers, and receptionists
+  const BRANCH_MANAGER_ALLOWED = ['attorney', 'bookkeeper', 'receptionist'];
+  if (inviterRole === 'branch_manager' && !BRANCH_MANAGER_ALLOWED.includes(role)) {
+    return res.status(403).json({ error: 'Branch managers can only add attorneys, bookkeepers, and receptionists.' });
   }
   try {
     const tempPass = 'ST@' + Math.random().toString(36).slice(2,8).toUpperCase() + '!' + new Date().getFullYear();
