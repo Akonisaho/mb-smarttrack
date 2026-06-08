@@ -161,7 +161,7 @@ export default function ClientPortal() {
     <div style={{...C.light, display:'flex', alignItems:'center', justifyContent:'center'}}>
       <div style={{width:'100%', maxWidth:400, padding:20}}>
         <div style={{textAlign:'center', marginBottom:28}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginBottom:6}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:1,marginBottom:6}}>
             <img src="/logo.png" alt="MB" style={{height:48,width:'auto',objectFit:'contain',borderRadius:6}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:28px;padding:0 6px;background:#8DC63F;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#0A0A0A">MB</div>');}}/>
             <span style={{fontWeight:900,fontSize:28,letterSpacing:'-0.04em'}}><span style={{color:'#111'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
           </div>
