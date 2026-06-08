@@ -185,7 +185,7 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
         <div style={S.logo}>
           <div style={{display:'flex',flexDirection:'column',gap:2}}>
             <div style={{display:'flex',alignItems:'center',gap:3}}>
-              <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:17,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:17px;padding:0 5px;background:#8DC63F;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:10px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
+              <img src={firm.logo_url || '/logo.png'} alt="MB" style={{height:30,width:'auto',objectFit:'contain',flexShrink:0,mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:17px;padding:0 5px;background:#8DC63F;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:10px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
               <span style={{fontSize:17,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
             </div>
             <div style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'0.1em',paddingLeft:2}}>{profile?.full_name}</div>
