@@ -3,66 +3,11 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabase';
 import { useFirmSettings } from '../lib/useFirmSettings';
+import { generateInvoicePDF } from '../lib/generateInvoicePDF';
 
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'});}catch{return d||'';} }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 
-function downloadInvoicePDF(inv, firm, clientName) {
-  const excl = (inv.total_units||0)*(inv.rate||150);
-  const vat  = excl * 0.15;
-  const incl = excl * 1.15;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${inv.id}</title>
-  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:40px;max-width:820px;margin:auto}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #8DC63F;padding-bottom:18px;margin-bottom:24px}
-  .logo{font-size:26px;font-weight:900;letter-spacing:-0.04em}.logo span{color:#8DC63F}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
-  .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#aaa;margin-bottom:3px}
-  .val{font-size:14px;font-weight:700}.sub{font-size:11px;color:#888;margin-top:2px}
-  .sumbar{display:flex;border:1px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:20px}
-  .sb{flex:1;padding:12px;text-align:center;border-right:1px solid #eee}.sb:last-child{border:none}
-  .slbl{font-size:9px;text-transform:uppercase;color:#aaa}.sval{font-size:17px;font-weight:800;margin-top:3px}
-  .totals{background:#f8f8f8;border-radius:8px;padding:16px 20px;margin-top:16px}
-  .trow{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
-  .trow.total{border-top:2px solid #ddd;margin-top:6px;padding-top:10px;font-size:18px;font-weight:800}
-  .bank{background:#f0fff4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-top:16px}
-  .bank h3{font-size:12px;color:#16a34a;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
-  .brow{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid #dcfce7}
-  .foot{margin-top:24px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#ccc;text-align:center;line-height:1.8}
-  @media print{body{padding:20px}}</style></head><body>
-  <div class="top">
-    <div><div class="logo">Smart<span>Track</span></div><div style="font-size:11px;color:#999;margin-top:2px">${firm.firm_name||''}${firm.vat_number?` · VAT: ${firm.vat_number}`:''}</div></div>
-    <div style="text-align:right"><h1 style="font-size:22px;font-weight:900">TAX INVOICE</h1><p style="font-size:11px;color:#999">${inv.id}</p><p style="font-size:11px;color:#999">Issued: ${fdate(inv.created_at?.substring(0,10)||'')}</p>${inv.due_date?`<p style="font-size:11px;color:#dc2626">Due: ${fdate(inv.due_date)}</p>`:''}</div>
-  </div>
-  <div class="grid">
-    <div><div class="lbl">Billed To</div><div class="val">${clientName||inv.client||''}</div><div class="sub">Matter: ${inv.matter_name||inv.matter_id||'—'}</div></div>
-    <div><div class="lbl">Attorney</div><div class="val">${inv.attorney||'—'}</div><div class="sub">Period: ${inv.period_label||'—'}</div></div>
-  </div>
-  <div class="sumbar">
-    <div class="sb"><div class="slbl">Units</div><div class="sval">${inv.total_units||0}</div></div>
-    <div class="sb"><div class="slbl">Rate/Unit</div><div class="sval">R${inv.rate||150}</div></div>
-    <div class="sb"><div class="slbl">Subtotal</div><div class="sval">R${excl.toFixed(2)}</div></div>
-    <div class="sb"><div class="slbl">VAT 15%</div><div class="sval">R${vat.toFixed(2)}</div></div>
-    <div class="sb"><div class="slbl">Total Due</div><div class="sval" style="color:#16a34a">R${incl.toFixed(2)}</div></div>
-  </div>
-  <div class="totals">
-    <div class="trow"><span>Subtotal (excl. VAT)</span><span>R${excl.toFixed(2)}</span></div>
-    <div class="trow"><span>VAT @ 15%</span><span>R${vat.toFixed(2)}</span></div>
-    <div class="trow total"><span>Total Due (incl. VAT)</span><span style="color:#16a34a">R${incl.toFixed(2)}</span></div>
-  </div>
-  ${(firm.bank_name||firm.bank_account)?`<div class="bank">
-    <h3>⬇ Payment Instructions</h3>
-    ${firm.bank_name?`<div class="brow"><span>Bank</span><span><strong>${firm.bank_name}</strong></span></div>`:''}
-    ${firm.bank_account?`<div class="brow"><span>Account Number</span><span><strong>${firm.bank_account}</strong></span></div>`:''}
-    ${firm.bank_branch?`<div class="brow"><span>Branch Code</span><span><strong>${firm.bank_branch}</strong></span></div>`:''}
-    <div class="brow"><span>Reference</span><span><strong>${inv.id}</strong></span></div>
-    <div class="brow" style="border:none"><span>Amount</span><span><strong style="color:#16a34a">R${incl.toFixed(2)}</strong></span></div>
-  </div>`:''}
-  <div class="foot">${firm.firm_name||''}${firm.vat_number?` · VAT Reg: ${firm.vat_number}`:''}${firm.bank_account?` · ${firm.bank_name} ${firm.bank_account}`:''}${firm.email?` · ${firm.email}`:''}<br/>${firm.invoice_footer||'This invoice is computer generated and valid without a signature.'}</div>
-  <script>window.onload=function(){window.print()}<\/script></body></html>`;
-  const w = window.open('','_blank','width=920,height=720');
-  w.document.write(html);
-  w.document.close();
-}
 
 export default function ClientPortal() {
   const firm = useFirmSettings();
@@ -404,7 +349,7 @@ export default function ClientPortal() {
               <td style={{...C.td,fontFamily:'monospace',fontWeight:600}}>{fmtR(amt)}</td>
               <td style={{...C.td,fontFamily:'monospace',color:p>0?'#16A34A':'#D1D5DB'}}>{p>0?fmtR(p):'—'}</td>
               <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:bal>0?'#DC2626':'#16A34A'}}>{bal>0?fmtR(bal):'PAID ✓'}</td>
-              <td style={C.td}><button style={{background:'#F9FAFB',border:'1px solid #E5E7EB',color:'#374151',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>downloadInvoicePDF(inv,firm,client?.full_name)}>⬇ PDF</button></td>
+              <td style={C.td}><button style={{background:'#F9FAFB',border:'1px solid #E5E7EB',color:'#374151',padding:'5px 12px',borderRadius:6,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>generateInvoicePDF(inv,firm,client?.full_name)}>⬇ PDF</button></td>
             </tr>);})}
             </tbody>
           </table></div>}

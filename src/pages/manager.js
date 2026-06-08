@@ -32,6 +32,8 @@ export default function Manager() {
   const [profile,setProfile]             = useState(null);
   const [loading,setLoading]             = useState(true);
   const [tab,setTab]                     = useState('overview');
+  const [isMobile,setIsMobile]           = useState(false);
+  useEffect(()=>{ const check=()=>setIsMobile(window.innerWidth<768); check(); window.addEventListener('resize',check); return()=>window.removeEventListener('resize',check); },[]);
   const todayStr = new Date().toLocaleDateString('en-CA');
   const [selDate,setSelDate]             = useState(todayStr);
   const [summary,setSummary]             = useState([]);
@@ -407,17 +409,17 @@ export default function Manager() {
               <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
             {[{l:'Billable Time',v:toHm(firmBillSec),s:`${firmAllUnits} units earned`,a:true,w:false},{l:'Billed Revenue',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`,a:true,w:false},{l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`,a:false,w:true},{l:'Total Trust Held',v:fmtR(totalTrustHeld),s:`${pendingPayments.length} payment${pendingPayments.length===1?'':'s'} pending`,a:false,w:false}].map(({l,v,s,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
             {branchTrustData.map(b=>(<div key={b.id} style={{...C.card,marginBottom:0}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div><div style={{fontSize:10,color:'#555',marginBottom:2}}>{b.address}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginTop:8,fontSize:11}}><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Receipts</div><div style={{color:'#8DC63F',fontWeight:600}}>{fmtR(b.receipts)}</div></div><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Payments</div><div style={{color:'#E05252',fontWeight:600}}>{fmtR(b.payments)}</div></div><div><div style={{fontSize:9,color:'#444',textTransform:'uppercase',marginBottom:2}}>Transactions</div><div style={{color:'#888',fontWeight:600}}>{b.txnCount}</div></div></div><div style={{marginTop:8,fontSize:10,color:'#555'}}>{profiles.filter(p=>p.branch_id===b.id).length} staff assigned</div></div>))}
           </div>
           <div style={C.card}>
             <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Leaderboard — {overviewPeriod==='day'?fdate(selDate):overviewPeriod==='week'?'This Week':overviewPeriod==='month'?new Date(selDate.substring(0,7)+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'}):'All Time'}</div>
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['#','Attorney','Branch','Billable Time','Units Earned','Target','Performance','Units Billed','Unbilled','Invoices'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!byAtty.length&&<tr><td colSpan={10} style={{padding:'30px',textAlign:'center',color:'#333',fontSize:13}}>No data yet.</td></tr>}{byAtty.map((a,i)=>{const target=a.monthly_target||0;const pct=target>0?Math.round((a.all_units/target)*100):null;const perfColor=pct===null?'#555':pct>=100?'#8DC63F':pct>=70?'#EAB308':'#E05252';return(<tr key={a.id}><td style={{...C.td,color:'#444',fontWeight:600,width:28}}>{i+1}</td><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{a.full_name}<div style={{fontSize:9,color:'#444'}}>{a.email}</div></td><td style={{...C.td,fontSize:10}}><span style={{background:'rgba(74,144,217,0.1)',color:'#4A90D9',padding:'2px 8px',borderRadius:20,fontSize:9,fontWeight:600}}>{a.branch_name}</span></td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{toHm(a.bill_sec)||'0m'}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontWeight:700}}>{a.all_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#555'}}>{target>0?target:'—'}</td><td style={C.td}>{pct!==null?(<div style={{display:'flex',alignItems:'center',gap:6}}><div style={{flex:1,height:6,background:'#1A1A1A',borderRadius:3}}><div style={{width:`${Math.min(pct,100)}%`,height:'100%',background:perfColor,borderRadius:3}}/></div><span style={{fontSize:10,color:perfColor,fontWeight:700,minWidth:35}}>{pct}%</span></div>):<span style={{color:'#333',fontSize:10}}>No target</span>}</td><td style={{...C.td,fontFamily:'monospace',color:'#8DC63F'}}>{a.billed_units||'—'}</td><td style={{...C.td,fontFamily:'monospace',color:a.unbilled_units>0?'#EAB308':'#444'}}>{a.unbilled_units>0?a.unbilled_units:'—'}</td><td style={{...C.td,fontFamily:'monospace',color:'#777'}}>{a.invoiceCount}</td></tr>);})}</tbody></table></div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:14}}>
             <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Top Matters by Billed Revenue</div>{!topMatters.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Matter ID','Client','Invoices','Billed'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{topMatters.map((m,i)=>(<tr key={i}><td style={{...C.td,fontFamily:'monospace',color:'#A78BFA',fontSize:10}}>{m.id}</td><td style={{...C.td,color:'#C8C8C8'}}>{m.client}</td><td style={{...C.td,fontFamily:'monospace',color:'#777',textAlign:'center'}}>{m.invoiceCount}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{m.billedAmt.toLocaleString()}</td></tr>))}</tbody></table>}</div>
             <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Recent Invoices</div>{!filtInvoices.length?<div style={{textAlign:'center',padding:'20px',color:'#333',fontSize:12}}>No invoices yet</div>:<table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Invoice','Client','Period','Incl. VAT'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{filtInvoices.slice(0,8).map(inv=>(<tr key={inv.id}><td style={{...C.td,fontFamily:'monospace',fontSize:10,color:'#888'}}>{inv.id}</td><td style={C.td}><div style={{color:'#C8C8C8',fontSize:11}}>{inv.client}</div><div style={{color:'#A78BFA',fontSize:10}}>{inv.matter_id}</div></td><td style={{...C.td,color:'#666',fontSize:10}}>{inv.period_label}</td><td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:'#8DC63F'}}>R{((inv.total_units||0)*(inv.rate||150)*1.15).toFixed(2)}</td></tr>))}</tbody></table>}</div>
           </div>
@@ -427,10 +429,10 @@ export default function Manager() {
         {tab==='trust'&&(<div style={C.main}>
           <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Trust Accounting</div>
           <div style={{fontSize:11,color:'#444',marginBottom:16}}>All branches · Legal Practice Act compliant</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:16}}>
             {[{l:'Total trust held',v:fmtR(totalTrustHeld),a:true,w:false},{l:'Total receipts',v:fmtR(trustTxns.filter(t=>t.type==='receipt'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},{l:'Total payments',v:fmtR(trustTxns.filter(t=>t.type==='payment'&&t.status==='posted').reduce((s,t)=>s+Number(t.amount),0)),a:false,w:false},{l:'Pending approvals',v:pendingPayments.length,a:false,w:pendingPayments.length>0}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
             {branchTrustData.map(b=>(<div key={b.id} style={{...C.card,marginBottom:0,cursor:'pointer'}} onClick={()=>setSelBranch(selBranch===b.id?'all':b.id)}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{b.name}</div><div style={{fontSize:16,fontWeight:700,color:'#4A90D9'}}>{fmtR(b.balance)}</div></div><div style={{fontSize:10,color:'#555',marginBottom:8}}>{b.address}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,fontSize:11}}><div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Receipts</div><div style={{color:'#8DC63F'}}>{fmtR(b.receipts)}</div></div><div><div style={{fontSize:9,color:'#444',marginBottom:1}}>Payments</div><div style={{color:'#E05252'}}>{fmtR(b.payments)}</div></div></div></div>))}
           </div>
           <div style={C.card}>
@@ -453,7 +455,7 @@ export default function Manager() {
       <select style={C.sel} value={selAtty} onChange={e=>setSelAtty(e.target.value)}><option value="all">All attorneys</option>{filteredProfiles.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
     </div>
   </div>
-  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+  <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
     {[{l:'Total Staff',v:filteredProfiles.length,s:'active staff'},{l:'Billable Time',v:toHm(firmBillSec),s:`${firmAllUnits} units earned`},{l:'Total Billed',v:`R${(billedRevenue*1.15).toFixed(2)}`,s:`${billedUnits} units · incl. VAT`},{l:'Unbilled Revenue',v:`R${unbilledRev.toLocaleString()}`,s:`${unbilledUnits} units not invoiced`}].map(({l,v,s})=>(<div key={l} style={C.stat(l==='Total Billed',l==='Unbilled Revenue')}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:l==='Total Billed'?'#8DC63F':l==='Unbilled Revenue'?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
   </div>
   {byAtty.filter(a=>a.all_units>0).length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Billing units per attorney</div><BarChart data={byAtty.filter(a=>a.all_units>0).map(a=>({label:a.full_name.replace('Adv. ','').split(' ')[0],label2:`${a.all_units}u`,value:a.all_units,color:'#8DC63F'}))} height={130}/></div>)}
@@ -470,7 +472,7 @@ export default function Manager() {
   </div>
   {!histLoading&&histData.every(m=>m.sessions===0)&&(<div style={{...C.card,textAlign:'center',padding:'30px 20px',marginBottom:14}}><div style={{fontSize:22,marginBottom:8}}>📊</div><div style={{fontSize:13,color:'#555',marginBottom:4}}>No activity data for {histYear}</div><div style={{fontSize:11,color:'#333'}}>Activities tracked by the Electron agent will appear here once attorneys start recording time.</div></div>)}
   {monthBars.length>0&&(<div style={{...C.card,marginBottom:14}}><div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>Billing units by month — {histYear}</div><BarChart data={monthBars} height={130}/></div>)}
-  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+  <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
     {histData.map(m=>{
       const isSelected=selMonth===m.month;
       const hasFuture=new Date(m.month+'-01')>new Date();
@@ -544,7 +546,7 @@ export default function Manager() {
     const totalUnbilled=wipData.reduce((s,p)=>s+p.unbilledUnits,0);
     const totalValue=wipData.reduce((s,p)=>s+p.estValue,0);
     return(<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Attorneys with unbilled work',v:wipData.length,s:'need to invoice'},{l:'Total unbilled units',v:totalUnbilled,s:'across all matters'},{l:'Total unbilled value',v:`R${totalValue.toLocaleString()}`,s:'excl. VAT',a:true}].map(({l,v,s,a})=>(<div key={l} style={C.stat(false,a)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,marginBottom:4,color:a?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
       </div>
       {!wipData.length?(<div style={{...C.card,textAlign:'center',padding:'40px',color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>✅</div><div style={{fontSize:14}}>All billable work has been invoiced</div><div style={{fontSize:11,color:'#444',marginTop:6}}>No outstanding WIP</div></div>):wipData.map(p=>(<div key={p.id} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{p.full_name}</div><div style={{fontSize:10,color:'#555'}}>{p.email} · {branches.find(b=>b.id===p.branch_id)?.name||'—'}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Earned</div><div style={{fontSize:16,fontWeight:700,color:'#888'}}>{p.earnedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Billed</div><div style={{fontSize:16,fontWeight:700,color:'#8DC63F'}}>{p.billedUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Unbilled</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>{p.unbilledUnits}</div></div><div style={{textAlign:'center'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Est. Value</div><div style={{fontSize:16,fontWeight:700,color:'#EAB308'}}>R{p.estValue.toLocaleString()}</div></div></div></div>
@@ -573,7 +575,7 @@ export default function Manager() {
         <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Debtors Age Analysis</div><div style={{fontSize:11,color:'#444'}}>Outstanding invoices · {new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
         <button style={C.btn('p')} onClick={()=>{setPayForm({invoiceId:'',amount:'',paymentDate:todayStr,reference:'',narration:''});setShowPayForm(true);}}>+ Record Payment</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(5,1fr)',gap:8,marginBottom:14}}>
         {Object.entries(buckets).map(([k,b])=>{const tot=b.invs.reduce((s,inv)=>s+outstanding(inv),0);return(<div key={k} style={C.stat(false,tot>0)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{b.label}</div><div style={{fontSize:18,fontWeight:800,color:tot>0?b.color:'#333'}}>{fmtR(tot)}</div><div style={{fontSize:10,color:'#444'}}>{b.invs.length} invoice{b.invs.length!==1?'s':''}</div></div>);})}
       </div>
       <div style={{...C.card,marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0'}}>Outstanding by Client</div><div style={{fontSize:13,fontWeight:700,color:'#EAB308'}}>{fmtR(totalOut)} total outstanding</div></div>
@@ -654,7 +656,7 @@ export default function Manager() {
     return(<>
       <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Financial Reports — Motsoeneng Bill</div>
       <div style={{fontSize:11,color:'#444',marginBottom:14}}>Revenue, collections and WIP summary</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Total Invoiced',v:fmtR(totalInvoiced),a:true},{l:'Total Collected',v:fmtR(totalCollected),a:true},{l:'Outstanding',v:fmtR(totalOutstanding),w:totalOutstanding>0},{l:'Collection Rate',v:`${totalInvoiced>0?Math.round(totalCollected/totalInvoiced*100):0}%`,a:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
       </div>
       <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Monthly Revenue — All Time</div>
@@ -700,7 +702,7 @@ export default function Manager() {
     return(<>
       <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em',marginBottom:4}}>Billing Statements</div>
       <div style={{fontSize:11,color:'#444',marginBottom:14}}>Per-client account statements · Print or email to clients</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Total clients',v:clients.length},{l:'Total invoiced',v:fmtR(clients.reduce((s,c)=>s+c.billed,0)),a:true},{l:'Total outstanding',v:fmtR(clients.reduce((s,c)=>s+Math.max(0,c.billed-c.paid),0)),w:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
       </div>
       {!clients.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📋</div><div>No invoices yet</div></div>):clients.map(c=>{const out=Math.max(0,c.billed-c.paid);return(<div key={c.client} style={C.card}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}><div><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0'}}>{c.client}</div><div style={{fontSize:10,color:'#555'}}>{c.invoices.length} invoice{c.invoices.length!==1?'s':''}</div></div><div style={{display:'flex',gap:16,alignItems:'center'}}><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Invoiced</div><div style={{fontSize:15,fontWeight:700,color:'#8DC63F'}}>{fmtR(c.billed)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Paid</div><div style={{fontSize:15,fontWeight:700,color:'#4A90D9'}}>{fmtR(c.paid)}</div></div><div style={{textAlign:'right'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Balance</div><div style={{fontSize:15,fontWeight:700,color:out>0?'#EAB308':'#8DC63F'}}>{out>0?fmtR(out):'Paid ✓'}</div></div><button style={C.btn('p')} onClick={()=>printStatement(c)}>Print Statement</button></div></div></div>);})}
@@ -718,7 +720,7 @@ export default function Manager() {
         <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Clients</div><div style={{fontSize:11,color:'#444'}}>{clients.length} clients · Firm-wide</div></div>
         <div style={{display:'flex',gap:8}}><button style={C.btn()} onClick={()=>router.push('/clients')}>Open Full CRM →</button></div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Total Clients',v:clients.length},{l:'FICA Compliant',v:clients.filter(c=>ficaStatus(c.id)==='compliant').length,a:true},{l:'FICA Pending',v:clients.filter(c=>ficaStatus(c.id)==='pending').length,w:true},{l:'FICA Expired',v:clients.filter(c=>ficaStatus(c.id)==='expired').length,w:true}].map(({l,v,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
       </div>
       <div style={C.card}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Ref','Client','Type','Email','FICA','Risk','Matters'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>
@@ -748,7 +750,7 @@ export default function Manager() {
         <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Disbursements</div><div style={{fontSize:11,color:'#444'}}>Costs advanced — all attorneys</div></div>
         <button style={C.btn('p')} onClick={()=>{setDisbForm({matter_id:'',date:todayStr,category:'copies',description:'',amount:'',quantity:1,vat_applicable:false,reference:''});setShowDisbForm(true);}}>+ Add Disbursement</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
         {[{l:'Unbilled disbursements',v:unbilled.length,s:'items'},{l:'Total unbilled',v:fmtR(totalUnbilled),s:'excl. VAT',w:totalUnbilled>0},{l:'Matters affected',v:Object.keys(byMatter).length,s:'with unbilled costs'}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&totalUnbilled>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
       </div>
       <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All Disbursements</div>
@@ -834,7 +836,7 @@ export default function Manager() {
             <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Firm Settings</div><div style={{fontSize:11,color:'#444'}}>Configure your firm details, billing rates and banking information</div></div>
             <button style={C.btn()} onClick={()=>router.push('/settings')}>Open full settings →</button>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:14}}>
             <div style={C.card}>
               <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Firm Information</div>
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -863,7 +865,7 @@ export default function Manager() {
             <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>All staff</div>
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Name','Title','Role','Branch','Change Branch','Rate (R)','Monthly Target (units)','Remove'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead><tbody>{!profiles.length&&<tr><td colSpan={8} style={{padding:'30px',textAlign:'center',color:'#333'}}>No staff yet</td></tr>}{profiles.map(p=>{ const br=branches.find(b=>b.id===p.branch_id); return(<tr key={p.id}><td style={{...C.td,fontWeight:500,color:'#D0D0D0'}}>{p.full_name}<div style={{fontSize:10,color:'#555'}}>{p.email||'—'}</div></td><td style={C.td}>{editingTitle[p.id]?(<input autoFocus type="text" defaultValue={p.title||''} placeholder="e.g. Senior Attorney" style={{background:'#1A1A1A',border:'1px solid #4A90D9',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:160,fontFamily:'inherit'}} onBlur={e=>saveTitle(p.id,e.target.value)} onKeyDown={e=>{if(e.key==='Enter')e.target.blur();if(e.key==='Escape')setEditingTitle(prev=>({...prev,[p.id]:false}));}}/>) :(<span style={{fontSize:11,color:p.title?'#C8C8C8':'#4A90D9',cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}} onClick={()=>setEditingTitle(prev=>({...prev,[p.id]:true}))} title="Click to edit">{p.title||'Set title'}</span>)}</td><td style={C.td}><span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:600,background:roleBg(p.role),color:roleColor(p.role)}}>{p.role||'attorney'}</span></td><td style={C.td}>{br?<span style={{fontSize:10,color:'#4A90D9',background:'rgba(74,144,217,0.1)',padding:'2px 8px',borderRadius:20}}>{br.name}</span>:<span style={{fontSize:10,color:'#555'}}>Not assigned</span>}</td><td style={C.td}><select className="mb-inp" style={{padding:'5px 10px',fontSize:11}} value={p.branch_id||''} onChange={e=>assignBranch(p.id,e.target.value)}><option value="">— select —</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></td><td style={C.td}><input type="number" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.rate||150} onBlur={async e=>{ const rate=parseFloat(e.target.value)||150; await supabase.from('profiles').update({rate}).eq('id',p.id); showAlert(`✓ Rate updated for ${p.full_name}`,'success'); }}/></td><td style={C.td}><input type="number" min="0" style={{background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'4px 8px',borderRadius:6,fontSize:11,width:80,fontFamily:'inherit'}} defaultValue={p.monthly_target||0} onBlur={async e=>{ const target=parseInt(e.target.value)||0; await supabase.from('profiles').update({monthly_target:target}).eq('id',p.id); showAlert(`✓ Target updated for ${p.full_name}`,'success'); }} placeholder="0"/></td><td style={C.td}><button style={{...C.btn('r'),fontSize:10,padding:'3px 10px'}} onClick={()=>removeStaff(p.id,p.full_name)}>Remove</button></td></tr>); })}</tbody></table></div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+          <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10}}>
             {branches.map(b=>{ const bStaff=profiles.filter(p=>p.branch_id===b.id); return(<div key={b.id} style={C.card}><div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:4}}>{b.name}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>{b.address}</div><div style={{fontSize:22,fontWeight:800,color:'#8DC63F',marginBottom:2}}>{bStaff.length}</div><div style={{fontSize:10,color:'#555',marginBottom:10}}>staff members</div><div style={{display:'flex',flexDirection:'column',gap:4}}>{bStaff.map(s=>(<div key={s.id} style={{fontSize:11,color:'#888',display:'flex',alignItems:'center',gap:6}}><span style={{width:6,height:6,borderRadius:'50%',background:roleColor(s.role),display:'inline-block',flexShrink:0}}/><span>{s.full_name}</span><span style={{fontSize:9,color:'#444'}}>({s.role||'attorney'})</span></div>))}{!bStaff.length&&<div style={{fontSize:11,color:'#333'}}>No staff assigned</div>}</div></div>); })}
           </div>
         </div>)}
@@ -967,7 +969,7 @@ export default function Manager() {
                 <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>VAT Report — VAT201 Supporting Schedule</div><div style={{fontSize:11,color:'#444'}}>Output VAT collected minus Input VAT on disbursements</div></div>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}><input type="month" style={C.sel} value={vatPeriod} onChange={e=>setVatPeriod(e.target.value)}/></div>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)',gap:10,marginBottom:14}}>
                 {[{l:'Output VAT (excl.)',v:fmtR(outputExcl),s:'invoiced excl. VAT',a:true},{l:'Output VAT (15%)',v:fmtR(outputVat),s:'VAT collected',a:true},{l:'Input VAT',v:fmtR(inputVat),s:'VAT on disbursements',w:false},{l:'VAT Payable to SARS',v:fmtR(vatPayable),s:vatPayable>0?'Due to SARS':'VAT credit',w:vatPayable>0,a:vatPayable<=0}].map(({l,v,s,a,w})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
               </div>
               <div style={C.card}><div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Output VAT — Invoices ({new Date(vatPeriod+'-01T12:00:00').toLocaleDateString('en-ZA',{month:'long',year:'numeric'})})</div>
@@ -996,7 +998,7 @@ export default function Manager() {
             const pending=undertakings.filter(u=>u.status==='pending');
             const overdue=undertakings.filter(u=>u.due_date&&new Date(u.due_date)<new Date()&&u.status==='pending');
             return(<>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
                 {[{l:'Total',v:undertakings.length,s:'all undertakings'},{l:'Pending',v:pending.length,s:'awaiting fulfilment',w:pending.length>0},{l:'Overdue',v:overdue.length,s:'past due date',w:overdue.length>0}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
               </div>
               {!undertakings.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>🤝</div><div>No undertakings yet</div></div>):
@@ -1058,7 +1060,7 @@ export default function Manager() {
                 <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Interest on Overdue Accounts</div><div style={{fontSize:11,color:'#444'}}>Legal rate: {RATE}% per annum · Invoices overdue &gt;30 days</div></div>
                 <button style={C.btn('p')} onClick={()=>overdueInvs.forEach(inv=>handleAddInterest(inv))}>Add Interest to All</button>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
                 {[{l:'Overdue invoices',v:overdueInvs.length,s:'>30 days',w:overdueInvs.length>0},{l:'Total outstanding',v:fmtR(overdueInvs.reduce((s,i)=>s+outstanding(i),0)),s:'excl. interest',w:true},{l:'Total interest due',v:fmtR(totalInterest),s:`@ ${RATE}% p.a.`,w:true}].map(({l,v,s,w})=>(<div key={l} style={C.stat(false,w&&overdueInvs.length>0)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:w&&overdueInvs.length>0?'#EAB308':'#F0F0F0'}}>{v}</div><div style={{fontSize:10,color:'#444'}}>{s}</div></div>))}
               </div>
               {!overdueInvs.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>✅</div><div>No overdue invoices</div></div>):
@@ -1105,7 +1107,7 @@ export default function Manager() {
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
               <div><div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>Client Campaigns</div><div style={{fontSize:11,color:'#444'}}>Send bulk emails to clients — overdue notices, newsletters, announcements</div></div>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:16}}>
               <div style={C.card}>
                 <div style={{fontSize:13,fontWeight:600,color:'#D0D0D0',marginBottom:14}}>Compose Campaign</div>
                 <div style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -1165,7 +1167,7 @@ export default function Manager() {
                     navigator.clipboard.writeText(txt);showAlert('✓ Performance review copied to clipboard');
                   }}>📋 Copy for Review</button>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:14}}>
                   {[{label:'H1 (Jan–Jun)',s:s1,months:h1months},{label:'H2 (Jul–Dec)',s:s2,months:h2months}].map(({label,s,months})=>(
                     <div key={label} style={{background:'#0D0D0D',borderRadius:8,padding:14}}>
                       <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:10}}>{label}</div>
@@ -1283,7 +1285,7 @@ export default function Manager() {
             const statusBg=(s)=>s==='pending'?'rgba(234,179,8,0.1)':s==='converted'?'rgba(141,198,63,0.1)':s==='rejected'?'rgba(220,80,80,0.1)':'rgba(74,144,217,0.1)';
             const statusCol=(s)=>s==='pending'?'#EAB308':s==='converted'?'#8DC63F':s==='rejected'?'#E05252':'#4A90D9';
             return(<>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
+              <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)',gap:10,marginBottom:14}}>
                 {[{l:'Total Requests',v:clientRequests.length},{l:'Pending',v:pending.length,w:pending.length>0},{l:'Converted to Clients',v:clientRequests.filter(r=>r.status==='converted').length,a:true}].map(({l,v,w,a})=>(<div key={l} style={C.stat(a,w)}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:a?'#8DC63F':w&&v>0?'#EAB308':'#F0F0F0'}}>{v}</div></div>))}
               </div>
               {!clientRequests.length?(<div style={{...C.card,textAlign:'center',padding:40,color:'#555'}}><div style={{fontSize:28,marginBottom:10}}>📬</div><div style={{fontSize:14}}>No requests yet</div><div style={{fontSize:11,color:'#333',marginTop:6}}>Client requests submitted via the portal or request form will appear here</div></div>):
