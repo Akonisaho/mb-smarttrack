@@ -42,7 +42,7 @@ export default async function handler(req, res) {
           from: 'MB SmartTrack <onboarding@resend.dev>',
           to: [client.email],
           subject,
-          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto"><p>Dear ${client.full_name},</p>${body.split('\n').map(l=>`<p>${l}</p>`).join('')}<p style="color:#888;font-size:12px;margin-top:32px">— Motsoeneng Bill Attorneys</p></div>`,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto"><p>Dear ${client.full_name},</p>${body.split('\n').map(l=>`<p>${l}</p>`).join('')}<p style="color:#888;font-size:12px;margin-top:32px">— Motsoeneng Bill</p></div>`,
         }),
       });
       if (r.ok) sent++; else skipped++;

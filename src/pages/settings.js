@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut } from '../lib/supabase';
@@ -54,7 +54,7 @@ export default function Settings() {
       : await supabase.from('firm_settings').insert([payload]);
     setSaving(false);
     if (error) { showMsg(setAlert, 'Error: ' + error.message, 'error'); return; }
-    showMsg(setAlert, '✓ Settings saved successfully.');
+    showMsg(setAlert, 'âœ“ Settings saved successfully.');
   }
 
   async function handleLogoUpload(file) {
@@ -67,7 +67,7 @@ export default function Settings() {
     const { data } = supabase.storage.from('matter-documents').getPublicUrl(path);
     setForm(f => ({ ...f, logo_url: data.publicUrl }));
     setLogoUploading(false);
-    showMsg(setAlert, '✓ Logo uploaded.');
+    showMsg(setAlert, 'âœ“ Logo uploaded.');
   }
 
   const C = {
@@ -83,7 +83,7 @@ export default function Settings() {
   if (loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
 
   return (<>
-    <Head><title>Firm Settings — SmartTrack</title></Head>
+    <Head><title>Firm Settings â€” SmartTrack</title></Head>
     <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',system-ui,sans-serif}::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:2px}button:hover{opacity:.85}textarea{resize:vertical}`}</style>
     <div style={C.page}>
       <NavBar
@@ -92,10 +92,10 @@ export default function Settings() {
         setTab={()=>{}}
         profile={profile}
         onSignOut={async()=>{await signOut();router.replace('/login');}}
-        rightSlot={<button style={C.btn()} onClick={()=>router.back()}>← Back</button>}
+        rightSlot={<button style={C.btn()} onClick={()=>router.back()}>â† Back</button>}
       />
 
-      {alert.msg&&<div style={{background:alert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${alert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'12px 24px',fontSize:12,color:alert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{alert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setAlert({msg:'',type:''})}>✕</button></div>}
+      {alert.msg&&<div style={{background:alert.type==='error'?'rgba(220,80,80,0.1)':'rgba(141,198,63,0.1)',border:`1px solid ${alert.type==='error'?'rgba(220,80,80,0.4)':'rgba(141,198,63,0.3)'}`,padding:'12px 24px',fontSize:12,color:alert.type==='error'?'#E05252':'#8DC63F',display:'flex',justifyContent:'space-between'}}><span>{alert.msg}</span><button style={{background:'none',border:'none',color:'inherit',cursor:'pointer'}} onClick={()=>setAlert({msg:'',type:''})}>âœ•</button></div>}
 
       <div style={C.main}>
         <div style={{fontSize:20,fontWeight:700,marginBottom:4}}>Firm Settings</div>
@@ -107,7 +107,7 @@ export default function Settings() {
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
             <div style={{gridColumn:'1/-1'}}>
               <label style={lbl}>Firm Name *</label>
-              <input style={inp} type="text" value={form.firm_name} onChange={e=>setForm(f=>({...f,firm_name:e.target.value}))} placeholder="e.g. Motsoeneng Bill Attorneys"/>
+              <input style={inp} type="text" value={form.firm_name} onChange={e=>setForm(f=>({...f,firm_name:e.target.value}))} placeholder="e.g. Motsoeneng Bill"/>
             </div>
             <div>
               <label style={lbl}>VAT Registration Number</label>
@@ -130,7 +130,7 @@ export default function Settings() {
               <div style={{display:'flex',alignItems:'center',gap:12}}>
                 {form.logo_url&&<img src={form.logo_url} alt="Logo" style={{width:60,height:60,objectFit:'contain',border:'1px solid #252525',borderRadius:6,background:'#1A1A1A',padding:4}}/>}
                 <div>
-                  <button style={C.btn()} onClick={()=>logoRef.current?.click()}>{logoUploading?'Uploading…':'Upload Logo'}</button>
+                  <button style={C.btn()} onClick={()=>logoRef.current?.click()}>{logoUploading?'Uploadingâ€¦':'Upload Logo'}</button>
                   <input ref={logoRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleLogoUpload(e.target.files[0])}/>
                   <div style={{fontSize:10,color:'#444',marginTop:4}}>PNG or JPG recommended. Max 2MB.</div>
                 </div>
@@ -191,9 +191,10 @@ export default function Settings() {
 
         <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
           <button style={C.btn()} onClick={()=>router.back()}>Cancel</button>
-          <button style={{...C.btn('p'),opacity:saving?.6:1,padding:'10px 28px',fontSize:13}} disabled={saving} onClick={handleSave}>{saving?'Saving…':'Save Settings'}</button>
+          <button style={{...C.btn('p'),opacity:saving?.6:1,padding:'10px 28px',fontSize:13}} disabled={saving} onClick={handleSave}>{saving?'Savingâ€¦':'Save Settings'}</button>
         </div>
       </div>
     </div>
   </>);
 }
+
