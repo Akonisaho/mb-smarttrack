@@ -183,13 +183,12 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
       <div style={S.hdr} ref={headerRef}>
         {/* LOGO */}
         <div style={S.logo}>
-          <img src={firm.logo_url || '/logo.png'} alt="MB" style={{width:44,height:44,objectFit:'contain',borderRadius:6,flexShrink:0}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="width:44px;height:44px;background:#8DC63F;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
-
-          <div style={{width:1,height:36,background:'#2A2A2A',flexShrink:0}}/>
-
-          <div style={{lineHeight:1.5}}>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></div>
-            <div style={{fontSize:11,color:'#555',textTransform:'uppercase',letterSpacing:'0.08em'}}>{profile?.full_name}</div>
+          <div style={{display:'flex',flexDirection:'column',gap:2}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <img src={firm.logo_url || '/logo.png'} alt="MB" style={{width:28,height:28,objectFit:'contain',borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="width:28px;height:28px;background:#8DC63F;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#0A0A0A;flex-shrink:0">MB</div>');}}/>
+              <span style={{fontSize:17,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
+            </div>
+            <div style={{fontSize:10,color:'#555',textTransform:'uppercase',letterSpacing:'0.1em',paddingLeft:2}}>{profile?.full_name}</div>
           </div>
         </div>
 
