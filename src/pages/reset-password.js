@@ -64,10 +64,11 @@ export default function ResetPassword() {
         <div style={{background:'#111',border:'1px solid #1A1A1A',borderRadius:12,padding:36,width:'100%',maxWidth:420}}>
 
           <div style={{textAlign:'center',marginBottom:28}}>
-            <img src="/logo.png" alt="MB" style={{width:80,height:80,objectFit:'contain',display:'block',margin:'0 auto 10px'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
-            <div style={{display:'none',width:64,height:64,background:'#8DC63F',borderRadius:10,alignItems:'center',justifyContent:'center',margin:'0 auto 10px',fontWeight:900,fontSize:20,color:'#0A0A0A'}}>MB</div>
-            <div style={{fontSize:16,fontWeight:700,color:'#F0F0F0'}}>SmartTrack</div>
-            <div style={{fontSize:11,color:'#444',textTransform:'uppercase',letterSpacing:'.1em',marginTop:3}}>Motsoeneng Bill</div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,marginBottom:6}}>
+              <img src="/logo.png" alt="MB" style={{height:32,width:'auto',objectFit:'contain'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:32px;padding:0 8px;background:#8DC63F;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#0A0A0A">MB</div>');}}/>
+              <span style={{fontSize:28,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
+            </div>
+            <div style={{fontSize:11,color:'#444',textTransform:'uppercase',letterSpacing:'.1em'}}>Motsoeneng Bill</div>
           </div>
 
           <div style={{fontSize:14,fontWeight:600,color:'#D0D0D0',marginBottom:20,textAlign:'center'}}>
