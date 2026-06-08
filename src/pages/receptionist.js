@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchCalendarEvents, saveCalendarEvent, deleteCalendarEvent } from '../lib/supabase';
 import { useFirmSettings } from '../lib/useFirmSettings';
+import { SkeletonDashboard } from '../components/Skeleton';
 import NavBar from '../components/NavBar';
 
 const EV_COLORS = { meeting:'#4A90D9', court:'#E05252', deadline:'#EAB308', call:'#A78BFA', other:'#8DC63F' };
@@ -105,7 +106,7 @@ export default function Receptionist() {
   const inp = { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'9px 12px', borderRadius:6, fontSize:12, fontFamily:"'DM Sans',system-ui,sans-serif", width:'100%', boxSizing:'border-box' };
   const lbl = { fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:4, display:'block' };
 
-  if (loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if (loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return (<>
     <Head><title>{firm.firm_name} — Reception</title></Head>

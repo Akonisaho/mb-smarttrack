@@ -80,6 +80,10 @@ export default function ClientPortal() {
   const [payments, setPayments] = useState([]);
   const otpRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
   const [otpDigits, setOtpDigits] = useState(['','','','','','']);
+  const [docs, setDocs] = useState([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docMsg, setDocMsg] = useState('');
+  const fileInputRef = useRef(null);
   const [showServiceReq, setShowServiceReq] = useState(false);
   const [serviceForm, setServiceForm] = useState({serviceType:'',description:'',urgency:'normal'});
   const [submittingReq, setSubmittingReq] = useState(false);
@@ -122,12 +126,13 @@ export default function ClientPortal() {
   }
 
   async function loadPortal(cid) {
-    const [cRes, invRes, mRes, tRes, pRes] = await Promise.all([
+    const [cRes, invRes, mRes, tRes, pRes, dRes] = await Promise.all([
       supabase.from('clients').select('*').eq('id', cid).single(),
       supabase.from('invoices').select('*').order('created_at', { ascending:false }),
       supabase.from('matters').select('id,name,client,client_id,status'),
       supabase.from('trust_transactions').select('*').eq('status','posted').order('date', { ascending:false }),
       supabase.from('invoice_payments').select('*'),
+      supabase.from('client_documents').select('*').eq('client_id', cid).order('created_at', { ascending:false }),
     ]);
     const c = cRes.data;
     setClient(c);
@@ -138,6 +143,27 @@ export default function ClientPortal() {
     setInvoices(clientInvs);
     setTrustTxns((tRes.data||[]).filter(t => clientMatterIds.includes(t.matter_id)));
     setPayments(pRes.data||[]);
+    setDocs(dRes.data||[]);
+  }
+
+  async function handleDocUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !clientId) return;
+    if (file.size > 10 * 1024 * 1024) { setDocMsg('File too large — max 10 MB.'); return; }
+    setUploadingDoc(true); setDocMsg('');
+    const ext = file.name.split('.').pop();
+    const path = `client-docs/${clientId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error: upErr } = await supabase.storage.from('client-documents').upload(path, file);
+    if (upErr) { setDocMsg('Upload failed: ' + upErr.message); setUploadingDoc(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('client-documents').getPublicUrl(path);
+    const { error: dbErr } = await supabase.from('client_documents').insert({ client_id: clientId, name: file.name, path, url: publicUrl, size: file.size, uploaded_by: 'client' });
+    setUploadingDoc(false);
+    if (dbErr) { setDocMsg('Saved upload but metadata failed: ' + dbErr.message); return; }
+    setDocMsg('Document uploaded successfully.');
+    setTimeout(() => setDocMsg(''), 4000);
+    const { data } = await supabase.from('client_documents').select('*').eq('client_id', clientId).order('created_at', { ascending:false });
+    setDocs(data||[]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   const paid = invId => payments.filter(p => p.invoice_id === invId).reduce((s,p) => s+Number(p.amount), 0);
@@ -393,7 +419,38 @@ export default function ClientPortal() {
           </table></div>
         </div>)}
 
-        <div style={{textAlign:'center',marginTop:24,fontSize:11,color:'#D1D5DB'}}>{firm.firm_name}{firm.vat_number?` · VAT: ${firm.vat_number}`:''}{firm.email?` · ${firm.email}`:''}<br/>This portal is read-only. Contact us for queries.</div>
+        {/* DOCUMENTS */}
+        <div style={C.card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <div style={{fontSize:14,fontWeight:600}}>My Documents ({docs.length})</div>
+            <label style={{background:'#8DC63F',border:'none',color:'#0A0A0A',padding:'7px 16px',borderRadius:7,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:700,display:'flex',alignItems:'center',gap:6}}>
+              {uploadingDoc ? 'Uploading…' : '+ Upload Document'}
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.txt" style={{display:'none'}} disabled={uploadingDoc} onChange={handleDocUpload}/>
+            </label>
+          </div>
+          {docMsg && <div style={{background: docMsg.includes('failed')||docMsg.includes('large') ? '#FEF2F2' : '#F0FDF4', border:`1px solid ${docMsg.includes('failed')||docMsg.includes('large')?'#FECACA':'#BBF7D0'}`, borderRadius:6, padding:'9px 14px', fontSize:12, color: docMsg.includes('failed')||docMsg.includes('large')?'#DC2626':'#16A34A', marginBottom:12}}>{docMsg}</div>}
+          <div style={{fontSize:11,color:'#9CA3AF',marginBottom:10}}>Accepted: PDF, Word, Excel, Images (max 10 MB). Visible to your legal team.</div>
+          {docs.length===0 ? <div style={{textAlign:'center',padding:20,color:'#9CA3AF',fontSize:13}}>No documents uploaded yet.</div> :
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {docs.map(d => {
+              const ext = (d.name||'').split('.').pop().toLowerCase();
+              const icon = ['pdf'].includes(ext)?'📄':['doc','docx'].includes(ext)?'📝':['xls','xlsx'].includes(ext)?'📊':['jpg','jpeg','png'].includes(ext)?'🖼️':'📎';
+              const size = d.size ? (d.size > 1024*1024 ? (d.size/1024/1024).toFixed(1)+' MB' : Math.round(d.size/1024)+' KB') : '';
+              return (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:12,background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:8,padding:'10px 14px'}}>
+                  <span style={{fontSize:20,flexShrink:0}}>{icon}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#111',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</div>
+                    <div style={{fontSize:11,color:'#9CA3AF',marginTop:2}}>{size}{d.created_at ? ` · ${new Date(d.created_at).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})}` : ''}{d.uploaded_by==='firm'?' · From your legal team':''}</div>
+                  </div>
+                  <a href={d.url} target="_blank" rel="noopener noreferrer" style={{background:'#F3F4F6',border:'1px solid #E5E7EB',color:'#374151',padding:'6px 14px',borderRadius:6,fontSize:12,textDecoration:'none',fontFamily:'inherit',fontWeight:600,whiteSpace:'nowrap'}}>⬇ Download</a>
+                </div>
+              );
+            })}
+          </div>}
+        </div>
+
+        <div style={{textAlign:'center',marginTop:24,fontSize:11,color:'#D1D5DB'}}>{firm.firm_name}{firm.vat_number?` · VAT: ${firm.vat_number}`:''}{firm.email?` · ${firm.email}`:''}<br/>This portal is read-only except for document uploads. Contact us for queries.</div>
       </div>
     </div>
   </>);

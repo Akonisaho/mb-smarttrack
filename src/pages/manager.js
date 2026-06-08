@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles, fetchManagerSummary, fetchInvoices, fetchInvoicePayments, saveInvoicePayment, deleteInvoicePayment, fetchClients, fetchAllFicaRecords, fetchDisbursements, saveDisbursement, deleteDisbursement, fetchFeeSchedules, saveFeeSchedule, saveInvoice, fetchCreditNotes, saveCreditNote, writeOffInvoice, undoWriteOff, fetchMatterNotes, saveMatterNote, deleteMatterNote, fetchUndertakings, saveUndertaking, fulfillUndertaking, deleteUndertaking, fetchClientCommunications, saveClientCommunication, deleteClientCommunication, fetchAuditLog, logAudit, saveInterestCharge, updateMatter } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});}catch{return d;} }
@@ -363,7 +364,7 @@ export default function Manager() {
     ntab:  (on)=>({background:'transparent',border:`1px solid ${on?'#2A2A2A':'transparent'}`,color:on?'#F0F0F0':'#555',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:on?600:400}),
   };
 
-  if(loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if(loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return(
     <>

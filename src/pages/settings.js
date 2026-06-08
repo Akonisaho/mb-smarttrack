@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function showMsg(set, msg, type='success') { set({ msg, type }); setTimeout(() => set({ msg:'', type:'' }), 5000); }
 
@@ -80,7 +81,7 @@ export default function Settings() {
   const lbl = { fontSize:11, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:5, display:'block', fontWeight:600 };
   const sec = { fontSize:13, fontWeight:700, color:'#D0D0D0', marginBottom:16, paddingBottom:10, borderBottom:'1px solid #1A1A1A' };
 
-  if (loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if (loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return (<>
     <Head><title>Firm Settings — SmartTrack</title></Head>

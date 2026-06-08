@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles, fetchInvoices } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
@@ -210,7 +211,7 @@ export default function Bookkeeper() {
     tinp: {background:'#1A1A1A',border:'1px solid #252525',color:'#F0F0F0',padding:'7px 10px',borderRadius:6,fontSize:12,fontFamily:'inherit',width:'100%',marginTop:4},
   };
 
-  if(loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if(loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   const total = totalTrustHeld();
   const ledger = selectedTrustMatter ? getMatterLedger(selectedTrustMatter) : [];

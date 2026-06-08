@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchDocuments, uploadDocument, deleteDocument, getDocumentUrl } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function fdate(d){ try{return new Date(d).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'});}catch{return d||'';} }
 function fsize(b){ if(!b)return'—'; if(b<1024)return b+'B'; if(b<1048576)return(b/1024).toFixed(1)+'KB'; return(b/1048576).toFixed(1)+'MB'; }
@@ -110,7 +111,7 @@ export default function DocumentsPage() {
   const inp = { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'9px 12px', borderRadius:6, fontSize:12, fontFamily:"'DM Sans',system-ui,sans-serif", width:'100%', boxSizing:'border-box' };
   const lbl = { fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:4, display:'block' };
 
-  if (loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if (loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return (<>
     <Head><title>MB SmartTrack — Documents</title></Head>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useToast } from '../components/Toast';
 import { useRouter } from 'next/router';
 import Fuse from 'fuse.js';
 import NavBar from '../components/NavBar';
@@ -18,6 +19,7 @@ import {
   searchAll
 } from '../lib/supabase';
 import Head from 'next/head';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function calcUnits(s){ return Math.max(1,Math.ceil((Number(s)||0)/360)); }
@@ -88,6 +90,7 @@ function DonutChart({segments,size=140}){
 export default function App() {
   const today=new Date().toLocaleDateString('en-CA');
   const router=useRouter();
+  const toast=useToast();
   const [user,setUser]=useState(null);
   const [profile,setProfile]=useState(null);
   const [authLoading,setAuthLoading]=useState(true);
@@ -467,7 +470,7 @@ const rFormDirty=useRef(false);
     setSavingCN(true);
     const{error}=await saveCreditNote({invoiceId:cnInvoice.id,client:cnInvoice.client,matterId:cnInvoice.matter_id,amount:cnForm.amount,reason:cnForm.reason},userId);
     setSavingCN(false);
-    if(error){alert('Error: '+error.message);return;}
+    if(error){toast('Error: '+error.message,'error');return;}
     const{creditNotes:cn}=await fetchCreditNotes(userId);
     setCreditNotes(cn);
     setShowCNForm(false);setCnInvoice(null);setCnForm({amount:'',reason:''});
@@ -477,8 +480,8 @@ const rFormDirty=useRef(false);
     const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})});
     const data=await res.json();
     setEmailingInv(null);
-    if(!res.ok){alert('Could not send: '+(data.error||'Unknown error'));return;}
-    alert(data.warning||`✓ Invoice emailed to ${data.sentTo}`);
+    if(!res.ok){toast('Could not send: '+(data.error||'Unknown error'),'error');return;}
+    toast(data.warning||`Invoice emailed to ${data.sentTo}`,'success');
   }
 
   async function seedDemo(){
@@ -508,7 +511,7 @@ const rFormDirty=useRef(false);
       if(!confirm(`⚠ Potential conflict of interest detected!\n\nClient "${matterForm.client}" appears in existing matters for: ${names}\n\nDo you want to continue?`)){ setMatterSaving(false); return; }
     }
     const res=await createMatter({...matterForm,userId:user.id,branchId:profile?.branch_id||null});
-    if(res.error){ alert(res.error.message); setMatterSaving(false); return; }
+    if(res.error){ toast(res.error.message,'error'); setMatterSaving(false); return; }
     const savedId=(res.data?.id||matterForm.id).toUpperCase();
     const words=[...matterForm.name.toLowerCase().split(/[\s\-\/,.()]+/),...matterForm.client.toLowerCase().split(/[\s\-\/,.()]+/)].filter(w=>w.length>2);
     const toLink=allActs.filter(a=>!a.matter&&words.some(w=>(a.window_title||'').toLowerCase().includes(w)));
@@ -535,7 +538,7 @@ const rFormDirty=useRef(false);
   async function handleSaveInvoice(){
     if(!preview||!invMatter) return;
     const res=await saveInvoice({client:invMatter.client,matter_id:invMatter.id,matter_name:invMatter.name,attorney:invAtty,period:invPeriod,period_label:preview.label,rate:invRate,total_units:preview.tU,total_amount:preview.tAmt,activity_ids:preview.bill.map(a=>a.id)},user.id);
-    if(res.error){ alert('Error: '+res.error.message); return; }
+    if(res.error){ toast('Error: '+res.error.message,'error'); return; }
     setPreview(null); await load(); setTab('archive');
   }
 
@@ -777,7 +780,7 @@ const rFormDirty=useRef(false);
   const gaugeColor = monthPct===null?'#444':monthPct>=100?'#6CC04A':monthPct>=70?'#EAB308':'#E05252';
   const monthName = today2.toLocaleDateString('en-ZA',{month:'long'});
 
-  if(authLoading) return <div style={{background:'#0A0A0A',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'system-ui',color:'#444',fontSize:13}}>Loading...</div>;
+  if(authLoading) return <div style={{background:'#0A0A0A',minHeight:'100vh'}}><SkeletonDashboard /></div>;
 
   return(<>
     <Head><title>MB SmartTrack</title></Head>
@@ -861,7 +864,7 @@ const rFormDirty=useRef(false);
               <div><label style={C.lbl}>Due Date</label><input style={C.inp} type="date" value={utForm.due_date} onChange={e=>setUtForm(f=>({...f,due_date:e.target.value}))}/></div>
             </div>
           </div>
-          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowUTForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!utForm.description.trim()||!utForm.matter_id} onClick={async()=>{const{error}=await saveUndertaking({...utForm},userId);if(error){alert('Error: '+error.message);return;}setShowUTForm(false);fetchUndertakings({userId}).then(r=>setUndertakings(r.undertakings||[])); }}>Save</button></div>
+          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowUTForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!utForm.description.trim()||!utForm.matter_id} onClick={async()=>{const{error}=await saveUndertaking({...utForm},userId);if(error){toast('Error: '+error.message,'error');return;}setShowUTForm(false);fetchUndertakings({userId}).then(r=>setUndertakings(r.undertakings||[])); }}>Save</button></div>
         </div></div>)}
       </div>)}
 
@@ -893,7 +896,7 @@ const rFormDirty=useRef(false);
             <div><label style={C.lbl}>Subject</label><input style={C.inp} placeholder="Brief subject..." value={commForm.subject} onChange={e=>setCommForm(f=>({...f,subject:e.target.value}))}/></div>
             <div><label style={C.lbl}>Notes *</label><textarea style={{...C.inp,minHeight:80,resize:'vertical'}} placeholder="What was discussed..." value={commForm.body} onChange={e=>setCommForm(f=>({...f,body:e.target.value}))}/></div>
           </div>
-          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowCommForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!commForm.body.trim()} onClick={async()=>{const{error}=await saveClientCommunication({...commForm},userId);if(error){alert('Error: '+error.message);return;}setShowCommForm(false);fetchClientCommunications({userId}).then(r=>setCommunications(r.communications||[])); }}>Log</button></div>
+          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}><button style={C.btn()} onClick={()=>setShowCommForm(false)}>Cancel</button><button style={C.btn('p')} disabled={!commForm.body.trim()} onClick={async()=>{const{error}=await saveClientCommunication({...commForm},userId);if(error){toast('Error: '+error.message,'error');return;}setShowCommForm(false);fetchClientCommunications({userId}).then(r=>setCommunications(r.communications||[])); }}>Log</button></div>
         </div></div>)}
       </div>)}
 
@@ -1055,7 +1058,7 @@ const rFormDirty=useRef(false);
                 <button style={{...C.btn('p'),fontSize:11}} onClick={()=>{
                   const txt=`PERFORMANCE REVIEW SUMMARY\n${label} ${yr}\nAttorney: ${profile?.full_name}\n\nBilling Units: ${units}${tgt>0?` / ${tgt} target (${pct3}%)`:''}
 \nBillable Time: ${toHm2(sec)}\nUtilisation: ${util}%\nRevenue Invoiced: R${invAmt.toFixed(2)} incl. VAT\n\nMonthly Breakdown:\n${months.map(m=>{const u=allActs.filter(a=>a.is_billable&&a.date?.startsWith(m)).reduce((s,a)=>s+(a.billing_units||0),0);return new Date(m+'-01T12:00:00').toLocaleString('en-ZA',{month:'long'})+': '+u+' units';}).join('\n')}`;
-                  navigator.clipboard.writeText(txt);alert('✓ Performance summary copied — paste into your review document');
+                  navigator.clipboard.writeText(txt);toast('Performance summary copied — paste into your review document','info');
                 }}>📋 Copy for Review</button>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>

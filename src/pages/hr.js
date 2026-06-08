@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchAllProfiles } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
@@ -171,7 +172,7 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
 
   const roleColor = r => r==='manager'||r==='national_manager'?'#A78BFA':r==='branch_manager'?'#4A90D9':r==='bookkeeper'?'#EAB308':r==='hr'?'#F472B6':'#8DC63F';
 
-  if (loading) return <div style={{...C.page,display:'flex',alignItems:'center',justifyContent:'center',color:'#444',fontSize:13}}>Loading...</div>;
+  if (loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return (<>
     <Head><title>HR Dashboard — MB SmartTrack</title></Head>

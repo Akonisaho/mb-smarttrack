@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { supabase, getProfile, signOut, fetchClients, saveClient, deleteClient, fetchFicaRecord, saveFicaRecord, fetchAllFicaRecords, createPortalAccess } from '../lib/supabase';
 import NavBar from '../components/NavBar';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 function fdate(d){ try{return new Date(d+'T12:00:00').toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'});}catch{return d||'';} }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
@@ -189,7 +190,7 @@ export default function ClientsPage() {
   const inp = { background:'#1A1A1A', border:'1px solid #252525', color:'#F0F0F0', padding:'9px 12px', borderRadius:6, fontSize:12, fontFamily:"'DM Sans',system-ui,sans-serif", width:'100%', boxSizing:'border-box' };
   const lbl = { fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:4, display:'block' };
 
-  if (loading) return <div style={{...C.page, display:'flex', alignItems:'center', justifyContent:'center', color:'#444', fontSize:13}}>Loading...</div>;
+  if (loading) return <div style={C.page}><SkeletonDashboard /></div>;
 
   return (<>
     <Head><title>MB SmartTrack — Clients</title></Head>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useFirmSettings } from '../lib/useFirmSettings';
 import { useOffline } from '../lib/useOffline';
+import GlobalSearch from './GlobalSearch';
 
 const NAV = {
   manager: [
@@ -251,6 +252,7 @@ export default function NavBar({ role, tab, setTab, onSignOut, profile, clock, p
 
         {/* RIGHT SIDE */}
         <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+          {!isMobile && <GlobalSearch />}
           {!isMobile && rightSlot}
           {!isMobile && clock&&<div style={S.pill}><div style={S.dot}/>{clock}</div>}
           {!isMobile && <button style={S.signOut} onClick={onSignOut}>Sign out</button>}

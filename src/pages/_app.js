@@ -2,6 +2,7 @@ import '../styles/globals.css';
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabase';
+import { ToastProvider } from '../components/Toast';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -19,5 +20,9 @@ export default function App({ Component, pageProps }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  return <Component {...pageProps} />;
+  return (
+    <ToastProvider>
+      <Component {...pageProps} />
+    </ToastProvider>
+  );
 }
