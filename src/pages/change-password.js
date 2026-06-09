@@ -53,10 +53,10 @@ export default function ChangePassword() {
     <div style={C.page}>
       <div style={{width:'100%',maxWidth:420,padding:20}}>
         <div style={{textAlign:'center',marginBottom:32}}>
-          {firm.logo_url
-            ? <img src={firm.logo_url} alt="" style={{width:56,height:56,objectFit:'contain',marginBottom:16}}/>
-            : <div style={{fontWeight:900,fontSize:32,letterSpacing:'-0.04em',marginBottom:16}}>Smart<span style={{color:'#8DC63F'}}>Track</span></div>
-          }
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:1,marginBottom:10}}>
+            <img src="/logo.png" alt="MB" style={{height:48,width:'auto',objectFit:'contain',mixBlendMode:'screen'}} onError={e=>{e.target.style.display='none';e.target.insertAdjacentHTML('afterend','<div style="height:28px;padding:0 6px;background:#8DC63F;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#0A0A0A">MB</div>');}}/>
+            <span style={{fontSize:28,fontWeight:700,letterSpacing:'-0.02em'}}><span style={{color:'#F0F0F0'}}>Smart</span><span style={{color:'#8DC63F'}}>Track</span></span>
+          </div>
           <div style={{fontSize:22,fontWeight:700,marginBottom:8}}>{isForced ? 'Set Your Password' : 'Change Password'}</div>
           <div style={{fontSize:13,color:'#555',lineHeight:1.5}}>
             {isForced
