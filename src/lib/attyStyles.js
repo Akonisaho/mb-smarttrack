@@ -1,0 +1,18 @@
+export const C = {
+  page: { background: '#0A0A0A', minHeight: '100vh', fontFamily: 'system-ui,sans-serif', color: '#F0F0F0' },
+  main: { maxWidth: 1300, margin: '0 auto', padding: '20px 24px' },
+  card: { background: '#111', border: '1px solid #1A1A1A', borderRadius: 8, padding: 16, marginBottom: 14 },
+  stat: (acc, warn) => ({ background: acc ? 'rgba(108,192,74,0.05)' : warn ? 'rgba(234,179,8,0.05)' : '#111', border: `1px solid ${acc ? 'rgba(108,192,74,0.25)' : warn ? 'rgba(234,179,8,0.25)' : '#1A1A1A'}`, borderRadius: 8, padding: 14 }),
+  btn: (v = 's') => ({ background: v === 'p' ? '#6CC04A' : v === 'pur' ? '#A78BFA' : v === 'r' ? 'rgba(220,80,80,0.15)' : v === 'trust' ? 'rgba(74,144,217,0.15)' : v === 'warn' ? 'rgba(234,179,8,0.15)' : v === 'g' ? 'rgba(108,192,74,0.08)' : 'transparent', border: v === 'p' || v === 'pur' ? 'none' : v === 'g' ? '1px solid rgba(108,192,74,0.35)' : v === 'r' ? '1px solid rgba(220,80,80,0.4)' : v === 'trust' ? '1px solid rgba(74,144,217,0.4)' : v === 'warn' ? '1px solid rgba(234,179,8,0.4)' : '1px solid #252525', color: v === 'p' ? '#0A0A0A' : v === 'pur' ? '#0A0A0A' : v === 'g' ? '#6CC04A' : v === 'r' ? '#E05252' : v === 'trust' ? '#4A90D9' : v === 'warn' ? '#EAB308' : '#888', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: v === 'p' || v === 'pur' ? 700 : 500, whiteSpace: 'nowrap' }),
+  sel: { background: '#1A1A1A', border: '1px solid #252525', color: '#F0F0F0', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontFamily: 'inherit' },
+  th: { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#444', padding: '9px 10px', borderBottom: '1px solid #181818', textAlign: 'left', fontWeight: 600 },
+  td: { padding: '9px 10px', fontSize: 11, borderBottom: '1px solid #161616', verticalAlign: 'middle' },
+  inp: { background: '#1A1A1A', border: '1px solid #252525', color: '#F0F0F0', padding: '7px 10px', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', width: '100%' },
+  asel: { background: '#1A1A1A', border: '1px solid #252525', color: '#F0F0F0', padding: '3px 7px', borderRadius: 4, fontSize: 10, fontFamily: 'inherit' },
+  ptab: (on) => ({ background: on ? '#2A2A2A' : 'transparent', border: 'none', color: on ? '#F0F0F0' : '#555', padding: '5px 14px', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: on ? 600 : 400 }),
+  ttab: (on) => ({ background: on ? 'rgba(74,144,217,0.15)' : 'transparent', border: `1px solid ${on ? 'rgba(74,144,217,0.4)' : '#252525'}`, color: on ? '#4A90D9' : '#555', padding: '6px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: on ? 600 : 400 }),
+  modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  mbox: { background: '#111', border: '1px solid #2A2A2A', borderRadius: 12, padding: 28, width: '100%', maxWidth: 480 },
+  lbl: { fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4, display: 'block' },
+  tinp: { background: '#1A1A1A', border: '1px solid #252525', color: '#F0F0F0', padding: '7px 10px', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', width: '100%', marginTop: 4 },
+};

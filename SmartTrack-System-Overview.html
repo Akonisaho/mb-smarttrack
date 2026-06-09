@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MB SmartTrack — Full System Overview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;background:#0A0A0A;color:#D0D0D0;line-height:1.6;padding:0}
+  .page{max-width:960px;margin:0 auto;padding:48px 32px}
+  h1{font-size:32px;font-weight:800;letter-spacing:-0.04em;margin-bottom:4px}
+  h1 span{color:#8DC63F}
+  .subtitle{font-size:13px;color:#444;margin-bottom:48px;text-transform:uppercase;letter-spacing:.1em}
+  h2{font-size:20px;font-weight:700;letter-spacing:-0.03em;margin:40px 0 12px;color:#F0F0F0;padding-bottom:8px;border-bottom:1px solid #1A1A1A}
+  h3{font-size:14px;font-weight:700;color:#8DC63F;margin:24px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+  h4{font-size:13px;font-weight:600;color:#C0C0C0;margin:18px 0 8px}
+  p{font-size:13px;color:#888;margin-bottom:10px}
+  ul,ol{padding-left:20px;margin-bottom:10px}
+  li{font-size:13px;color:#888;margin-bottom:4px}
+  li strong{color:#C0C0C0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
+  th{background:#111;color:#555;font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;text-align:left;border-bottom:1px solid #1A1A1A}
+  td{padding:8px 10px;border-bottom:1px solid #111;color:#888;vertical-align:top}
+  td:first-child{color:#C0C0C0;font-weight:500;white-space:nowrap}
+  tr:hover td{background:rgba(141,198,63,0.02)}
+  .card{background:#0F0F0F;border:1px solid #1A1A1A;border-radius:10px;padding:20px;margin-bottom:16px}
+  .role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0}
+  .role-card{background:#0F0F0F;border:1px solid #1A1A1A;border-radius:8px;padding:14px 16px}
+  .role-card .role{font-size:11px;color:#8DC63F;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+  .role-card .pg{font-size:12px;color:#888;font-family:monospace}
+  .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;margin:0 2px}
+  .badge-green{background:rgba(141,198,63,0.1);color:#8DC63F;border:1px solid rgba(141,198,63,0.3)}
+  .badge-yellow{background:rgba(234,179,8,0.1);color:#EAB308;border:1px solid rgba(234,179,8,0.3)}
+  .badge-red{background:rgba(220,80,80,0.1);color:#E05252;border:1px solid rgba(220,80,80,0.3)}
+  .badge-blue{background:rgba(74,144,217,0.1);color:#4A90D9;border:1px solid rgba(74,144,217,0.3)}
+  .subtab{display:inline-flex;align-items:center;gap:6px;background:#111;border:1px solid #1A1A1A;border-radius:6px;padding:6px 14px;margin:3px;font-size:12px;color:#C0C0C0;font-weight:500}
+  .subtab-active{background:rgba(141,198,63,0.1);border-color:rgba(141,198,63,0.3);color:#8DC63F}
+  .alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:10px}
+  .alert-yellow{background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.3);color:#EAB308}
+  .alert-red{background:rgba(220,80,80,0.08);border:1px solid rgba(220,80,80,0.3);color:#E05252}
+  .alert-green{background:rgba(141,198,63,0.08);border:1px solid rgba(141,198,63,0.3);color:#8DC63F}
+  .flow{background:#0F0F0F;border:1px solid #1A1A1A;border-radius:8px;padding:20px;font-family:monospace;font-size:12px;color:#555;margin:16px 0;line-height:2.2}
+  .flow span{color:#8DC63F}
+  .divider{height:1px;background:#1A1A1A;margin:32px 0}
+  .toc{background:#0F0F0F;border:1px solid #1A1A1A;border-radius:10px;padding:24px;margin-bottom:40px}
+  .toc a{color:#4A90D9;text-decoration:none;font-size:13px;display:block;padding:5px 0;border-bottom:1px solid #111}
+  .toc a:last-child{border-bottom:none}
+  .toc a:hover{color:#8DC63F}
+  .section-label{font-size:9px;color:#333;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-top:14px;padding:4px 0}
+  code{font-family:monospace;font-size:11px;background:#111;color:#A78BFA;padding:1px 6px;border-radius:4px}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+  .stat-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+  .stat-box{background:#0D0D0D;border:1px solid #1A1A1A;border-radius:8px;padding:14px}
+  .stat-box .lbl{font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px}
+  .stat-box .val{font-size:18px;font-weight:800;color:#6CC04A}
+  .stat-box .val.neutral{color:#F0F0F0}
+  .stat-box .val.red{color:#E05252}
+  .stat-box .val.blue{color:#4A90D9}
+  .print-btn{position:fixed;bottom:28px;right:28px;background:#8DC63F;color:#0A0A0A;border:none;border-radius:10px;padding:14px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(141,198,63,0.3);z-index:999}
+  .print-btn:hover{background:#6CC04A}
+
+  @media print{
+    .print-btn{display:none}
+    body{background:#fff;color:#111}
+    h1{color:#111}
+    h1 span{color:#4a7a10}
+    .subtitle{color:#888}
+    h2{color:#111;border-color:#ccc}
+    h3{color:#4a7a10}
+    h4{color:#333}
+    p,li,td{color:#444}
+    td:first-child{color:#111}
+    th{color:#555;background:#f5f5f5}
+    .card,.role-card,.toc,.flow,.stat-box{background:#f9f9f9;border-color:#ddd}
+    .badge-green{background:#eaf5d0;color:#3a7010;border-color:#8dc63f}
+    .badge-yellow{background:#fff8d0;color:#7a5a00;border-color:#c8a000}
+    .badge-red{background:#ffe8e8;color:#a00;border-color:#e08080}
+    .badge-blue{background:#e8f0ff;color:#00308a;border-color:#80a0e0}
+    .alert-yellow{background:#fff8d0;border-color:#c8a000;color:#7a5a00}
+    .alert-red{background:#ffe8e8;border-color:#e08080;color:#a00}
+    .alert-green{background:#eaf5d0;border-color:#8dc63f;color:#3a7010}
+    .subtab{background:#f0f0f0;border-color:#ccc;color:#333}
+    .subtab-active{background:#eaf5d0;border-color:#8dc63f;color:#3a7010}
+    .stat-box .val{color:#3a7010}
+    .stat-box .val.neutral{color:#111}
+    .stat-box .val.red{color:#a00}
+    .stat-box .val.blue{color:#00308a}
+    .stat-box .lbl{color:#888}
+    .flow{color:#555}
+    .flow span{color:#3a7010}
+    code{background:#f0f0f0;color:#5a00a0}
+    .toc a{color:#00308a}
+    .role-card .role{color:#3a7010}
+    .role-card .pg{color:#555}
+    h2{page-break-before:auto}
+    .divider{border-color:#ddd}
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">⬇ Download / Print PDF</button>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <h1>MB <span>SmartTrack</span></h1>
+  <div class="subtitle">Full System Documentation &mdash; All Roles &amp; Tabs &mdash; Generated 08 June 2026</div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc">
+    <h3 style="margin-top:0;margin-bottom:14px">Table of Contents</h3>
+    <div class="section-label">System</div>
+    <a href="#overview">1. What is SmartTrack?</a>
+    <a href="#roles">2. Roles &amp; Access</a>
+    <a href="#pages">3. All Pages &amp; Routes</a>
+    <div class="section-label">Dashboards</div>
+    <a href="#attorney">4. Attorney Dashboard — All Tabs</a>
+    <a href="#manager">5. Manager Dashboard — All Tabs</a>
+    <a href="#bookkeeper">6. Bookkeeper Dashboard — All Tabs</a>
+    <a href="#receptionist">7. Receptionist Dashboard — All Tabs</a>
+    <a href="#hr">8. HR Dashboard — All Tabs</a>
+    <div class="section-label">Standalone Pages</div>
+    <a href="#calendar">9. Calendar</a>
+    <a href="#documents">10. Documents</a>
+    <a href="#clients">11. Clients &amp; FICA</a>
+    <a href="#settings">12. Firm Settings</a>
+    <a href="#portal">13. Client Portal</a>
+    <div class="section-label">Trust Account — Full Detail</div>
+    <a href="#trust-overview">14. Trust Account — Overview &amp; Alert Banners</a>
+    <a href="#trust-ledger">15. Ledger Sub-tab</a>
+    <a href="#trust-receipt">16. Receipt Sub-tab</a>
+    <a href="#trust-payment">17. Payment Sub-tab</a>
+    <a href="#trust-transfer">18. Transfer Sub-tab</a>
+    <a href="#trust-recon">19. Reconciliation Sub-tab</a>
+    <a href="#trust-reports">20. Reports Sub-tab</a>
+    <a href="#trust-approvals">21. Approvals Sub-tab</a>
+    <a href="#trust-settings">22. Trust Settings Sub-tab</a>
+    <a href="#trust-flow">23. Data Flow &amp; Architecture</a>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="overview">1. What is SmartTrack?</h2>
+  <p>MB SmartTrack is a full legal practice management dashboard built for <strong>Motsoeneng Bill (MB)</strong> law firm. It runs in the browser and manages every aspect of the firm's daily operations.</p>
+  <ul>
+    <li>Automatic PC activity time-tracking and billing unit calculation (1 unit = 6 minutes)</li>
+    <li>Matter (legal file) management with notes, undertakings, and communications</li>
+    <li>Invoicing from tracked time with PDF generation and email delivery</li>
+    <li>Full Legal Practice Act-compliant trust accounting</li>
+    <li>Client FICA compliance monitoring</li>
+    <li>Document management — upload, tag, download</li>
+    <li>Shared firm calendar — meetings, court dates, deadlines, calls</li>
+    <li>HR management — staff profiles, leave, 360 feedback, payroll summaries</li>
+    <li>Client-facing self-service portal with OTP login</li>
+  </ul>
+  <p><strong>Tech stack:</strong> Next.js (React) frontend · Supabase (auth + database) · jsPDF for PDF generation · FNB/ABSA/Standard Bank/Nedbank CSV import for reconciliation.</p>
+  <p><strong>Currency:</strong> South African Rand (R) &nbsp;·&nbsp; <strong>Locale:</strong> en-ZA &nbsp;·&nbsp; <strong>Billing units:</strong> 1 unit = 6 minutes (legal industry standard)</p>
+
+  <!-- 2 -->
+  <h2 id="roles">2. Roles &amp; Access</h2>
+  <p>On login the system reads the user's role and redirects them to the correct dashboard. All first-time users are forced to <code>/change-password</code> before reaching their dashboard.</p>
+  <div class="role-grid">
+    <div class="role-card"><div class="role">Attorney</div><div class="pg">/ (main)</div></div>
+    <div class="role-card"><div class="role">Manager</div><div class="pg">/manager</div></div>
+    <div class="role-card"><div class="role">National Manager</div><div class="pg">/manager</div></div>
+    <div class="role-card"><div class="role">Branch Manager</div><div class="pg">/manager</div></div>
+    <div class="role-card"><div class="role">Bookkeeper</div><div class="pg">/bookkeeper</div></div>
+    <div class="role-card"><div class="role">Receptionist</div><div class="pg">/receptionist</div></div>
+    <div class="role-card"><div class="role">HR</div><div class="pg">/hr</div></div>
+    <div class="role-card"><div class="role">Client (external)</div><div class="pg">/portal (OTP)</div></div>
+  </div>
+
+  <!-- 3 -->
+  <h2 id="pages">3. All Pages &amp; Routes</h2>
+  <table>
+    <thead><tr><th>Route</th><th>Page</th><th>Who can access</th></tr></thead>
+    <tbody>
+      <tr><td><code>/</code></td><td>Attorney Dashboard</td><td>Attorneys only</td></tr>
+      <tr><td><code>/manager</code></td><td>Manager Dashboard</td><td>Manager, National Manager, Branch Manager</td></tr>
+      <tr><td><code>/bookkeeper</code></td><td>Bookkeeper Dashboard</td><td>Bookkeeper only</td></tr>
+      <tr><td><code>/receptionist</code></td><td>Receptionist Dashboard</td><td>Receptionist only</td></tr>
+      <tr><td><code>/hr</code></td><td>HR Dashboard</td><td>HR, Manager, National Manager</td></tr>
+      <tr><td><code>/calendar</code></td><td>Firm Calendar</td><td>All staff roles</td></tr>
+      <tr><td><code>/documents</code></td><td>Document Management</td><td>All staff roles</td></tr>
+      <tr><td><code>/clients</code></td><td>Client Registry</td><td>All staff roles</td></tr>
+      <tr><td><code>/settings</code></td><td>Firm Settings</td><td>Manager, National Manager only</td></tr>
+      <tr><td><code>/portal</code></td><td>Client Portal</td><td>Clients only — email OTP login</td></tr>
+      <tr><td><code>/login</code></td><td>Login Page</td><td>Everyone (unauthenticated)</td></tr>
+      <tr><td><code>/reset-password</code></td><td>Password Reset</td><td>Everyone</td></tr>
+      <tr><td><code>/change-password</code></td><td>Force Change Password</td><td>First-login staff users</td></tr>
+      <tr><td><code>/rate</code></td><td>Client Satisfaction Survey</td><td>Clients (via emailed link)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 4 -->
+  <h2 id="attorney">4. Attorney Dashboard — All Tabs</h2>
+  <p>The primary workspace for fee-earning attorneys. Data auto-refreshes every 2 minutes.</p>
+  <table>
+    <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Today</td><td>Live view of today's PC activity. Every app and window is captured with start/end times and billing units. Manual call logging. Monthly target gauge (green ≥100%, yellow ≥70%, red &lt;70%).</td></tr>
+      <tr><td>Matters</td><td>All open legal files. Notes (general/urgent/reminder), communications log (calls, emails, letters), undertakings (given/received with due dates). Create and close matters.</td></tr>
+      <tr><td>All Activities</td><td>Every tracked session across all dates. Filter by date, app, client. Reclassify, reassign to matters, adjust billable status.</td></tr>
+      <tr><td>Analytics</td><td>Billable % donut chart + daily revenue bar chart. Toggle day / week / month / year.</td></tr>
+      <tr><td>History</td><td>Year → month → session drill-down. Shows hours, units, and value per month.</td></tr>
+      <tr><td>Invoice</td><td>Generate invoices from tracked time. PDF download, email to client, credit notes, write-offs, payment recording.</td></tr>
+      <tr><td>Costs</td><td>Disbursements: copies, SAPS searches, court fees, postage, advocate fees, etc. Linked to matters. Appear on invoices.</td></tr>
+      <tr><td>Archive</td><td>Read-only history of all closed, paid, and written-off invoices.</td></tr>
+      <tr><td>Trust Account</td><td>Attorney's own trust ledger — 8 sub-tabs. See Sections 14–23.</td></tr>
+      <tr><td>Calendar</td><td>Link → /calendar</td></tr>
+      <tr><td>Documents</td><td>Link → /documents</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 5 -->
+  <h2 id="manager">5. Manager Dashboard — All Tabs</h2>
+  <p>Sees everything firm-wide across all attorneys and branches. Data refreshes every 30 seconds.</p>
+  <table>
+    <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Overview</td><td>Firm-wide summary cards — WIP, billings, hours. Per-attorney breakdown. Filter by attorney or branch. Toggle day/week/month/year.</td></tr>
+      <tr><td>Invoices</td><td>All firm invoices. Record payments, issue credit notes, write off debt, email clients, set payment plans.</td></tr>
+      <tr><td>WIP Report</td><td>All unbilled billable time across all attorneys — unrecovered hours and value.</td></tr>
+      <tr><td>Debtors</td><td>All clients with outstanding invoice balances and days overdue.</td></tr>
+      <tr><td>Statements</td><td>Generate full client account statements with invoice and payment history.</td></tr>
+      <tr><td>Disbursements</td><td>All firm-wide costs. Add new, view per matter.</td></tr>
+      <tr><td>Trust</td><td>Full trust accounting — all 8 sub-tabs. Yellow badge shows pending approval count. See Sections 14–23.</td></tr>
+      <tr><td>Reports</td><td>Trial balance and cashbook reports by branch and date range.</td></tr>
+      <tr><td>Fee Schedules</td><td>Create billing rate schedules. Set unit rate per schedule. Mark one as default.</td></tr>
+      <tr><td>Clients</td><td>Full client registry with FICA tracking. Red sidebar badge = count of non-compliant clients.</td></tr>
+      <tr><td>Analytics</td><td>Firm-wide revenue trends, billable hours per attorney, top clients.</td></tr>
+      <tr><td>History</td><td>Per-attorney monthly history across any year.</td></tr>
+      <tr><td>Staff</td><td>All profiles. Invite new staff (sends email credentials). Edit titles. View per-person billing stats.</td></tr>
+      <tr><td>Calendar / Documents / Settings</td><td>Links to shared standalone pages.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6 -->
+  <h2 id="bookkeeper">6. Bookkeeper Dashboard — All Tabs</h2>
+  <p>Focused purely on financial and trust work. No access to attorney activity data or HR.</p>
+  <table>
+    <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Trust</td><td>Full trust accounting — all 8 sub-tabs. Primary workstation for daily entries and month-end reconciliation.</td></tr>
+      <tr><td>Invoices</td><td>All firm invoices. View, filter, record payments.</td></tr>
+      <tr><td>Archive</td><td>Historical closed and written-off invoices.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 7 -->
+  <h2 id="receptionist">7. Receptionist Dashboard — All Tabs</h2>
+  <p>Front-desk role. No access to billing or trust data.</p>
+  <table>
+    <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td>Today's events, upcoming appointments, client and matter counts at a glance.</td></tr>
+      <tr><td>Clients</td><td>Client directory — search and view contact details.</td></tr>
+      <tr><td>Calendar</td><td>Create, edit, delete events. Colour-coded: blue=meeting, red=court, yellow=deadline, purple=call, green=other.</td></tr>
+      <tr><td>Matters</td><td>Browse all active matters — read-only reference lookup.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 8 -->
+  <h2 id="hr">8. HR Dashboard — All Tabs</h2>
+  <p>People management and performance tracking. Accessible to HR, Manager, and National Manager.</p>
+  <table>
+    <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Staff</td><td>All profiles with H1/H2 billing performance. Edit job titles (Partner, Senior Attorney, Associate, Candidate Attorney, etc.).</td></tr>
+      <tr><td>Leave</td><td>Submit, approve, reject leave (annual, sick, family, study). Filter by status. Leave calendar.</td></tr>
+      <tr><td>360 Feedback</td><td>Peer reviews scored on billing discipline, client service, teamwork, legal knowledge, overall. Anonymous option.</td></tr>
+      <tr><td>Payroll</td><td>Monthly billing units and value per staff member for payroll calculation.</td></tr>
+      <tr><td>Satisfaction</td><td>Client satisfaction survey scores per attorney — submitted by clients via emailed link after matter completion.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 9 -->
+  <h2 id="calendar">9. Calendar Page (<code>/calendar</code>)</h2>
+  <ul>
+    <li><strong>Views:</strong> Month, Week, Day</li>
+    <li><strong>Event types:</strong> Meeting (blue) · Court date (red) · Deadline (yellow) · Call (purple) · Other (green)</li>
+    <li>Managers see all staff events and can filter by person. Attorneys see their own + firm-wide events.</li>
+    <li>Create events with: title, type, date, time, all-day toggle, location, linked matter, firm-wide flag.</li>
+    <li>Click any day to pre-fill the add-event form with that date.</li>
+  </ul>
+
+  <!-- 10 -->
+  <h2 id="documents">10. Documents Page (<code>/documents</code>)</h2>
+  <ul>
+    <li><strong>Document types:</strong> Pleading · Contract · Correspondence · FICA · Invoice · Affidavit · Court Order · Notice · Other</li>
+    <li>Each document links to a matter and/or client.</li>
+    <li>Upload form: file picker, matter, client, document type, description.</li>
+    <li>Filter by type or matter. Download any document. File size displayed (KB/MB).</li>
+    <li>Managers see all firm documents. Attorneys see their own.</li>
+  </ul>
+
+  <!-- 11 -->
+  <h2 id="clients">11. Clients Page (<code>/clients</code>)</h2>
+  <h4>Client record fields</h4>
+  <table>
+    <thead><tr><th>Field</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Full name</td><td>Individual or company name</td></tr>
+      <tr><td>Client type</td><td>Individual or Company</td></tr>
+      <tr><td>ID number</td><td>South African ID number</td></tr>
+      <tr><td>Company reg</td><td>CIPC registration (companies)</td></tr>
+      <tr><td>Email / Phone / Address</td><td>Full contact details</td></tr>
+      <tr><td>Branch</td><td>Which branch the client belongs to</td></tr>
+      <tr><td>Notes</td><td>Free text internal notes</td></tr>
+    </tbody>
+  </table>
+  <h4>FICA Compliance (per client)</h4>
+  <table>
+    <thead><tr><th>Check</th><th>Status options</th></tr></thead>
+    <tbody>
+      <tr><td>ID verified</td><td>Yes / No + expiry date</td></tr>
+      <tr><td>Proof of address</td><td>Yes / No + document date</td></tr>
+      <tr><td>Source of funds</td><td>Yes / No</td></tr>
+      <tr><td>PEP check</td><td>Yes / No (Politically Exposed Person)</td></tr>
+    </tbody>
+  </table>
+  <p>FICA status calculated automatically: <span class="badge badge-green">Compliant</span> · <span class="badge badge-yellow">Partial</span> · <span class="badge badge-red" style="color:#E07B30;background:rgba(224,123,48,0.1);border-color:rgba(224,123,48,0.3)">Pending</span> · <span class="badge badge-red">Expired</span></p>
+  <p>A red badge on the Manager sidebar shows total count of non-compliant clients. Client detail view shows their matters, invoices, trust balances, and a button to grant Client Portal access.</p>
+
+  <!-- 12 -->
+  <h2 id="settings">12. Firm Settings (<code>/settings</code>)</h2>
+  <p>Manager and National Manager only.</p>
+  <table>
+    <thead><tr><th>Setting</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td>Firm name</td><td>Appears on all invoices and documents</td></tr>
+      <tr><td>Logo</td><td>Shown in sidebar, invoices, and client portal</td></tr>
+      <tr><td>VAT number</td><td>Printed on every invoice</td></tr>
+      <tr><td>LPC number</td><td>Legal Practice Council number on documents</td></tr>
+      <tr><td>Invoice prefix</td><td>e.g. "INV" → invoices numbered INV-001, INV-002</td></tr>
+      <tr><td>Bank name / account / branch</td><td>Printed on invoices for client EFT payments</td></tr>
+      <tr><td>Address / Phone / Email / Website</td><td>Firm contact details on all documents</td></tr>
+      <tr><td>Default billing rate</td><td>Default rate per billing unit (e.g. R150) — overridable per attorney</td></tr>
+      <tr><td>Invoice footer</td><td>Custom text at bottom of every invoice (e.g. payment terms)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 13 -->
+  <h2 id="portal">13. Client Portal (<code>/portal</code>)</h2>
+  <h4>Login flow</h4>
+  <ol>
+    <li>Client enters email address</li>
+    <li>System emails a 6-digit OTP code</li>
+    <li>Client enters the code (6 digit boxes, auto-advances focus)</li>
+    <li>Portal loads their data on success</li>
+  </ol>
+  <h4>What a client sees</h4>
+  <ul>
+    <li><strong>Invoices</strong> — all their invoices with status (unpaid / partial / paid) and amounts</li>
+    <li><strong>Trust account</strong> — all trust transactions for their matters</li>
+    <li><strong>Matters</strong> — active matters and their status</li>
+    <li><strong>Documents</strong> — documents shared with them (download any)</li>
+    <li><strong>Upload documents</strong> — upload ID, proof of address, etc. directly to the firm</li>
+    <li><strong>Service request</strong> — submit a request with description and urgency (normal / urgent / emergency)</li>
+  </ul>
+  <h4>New client request (unauthenticated)</h4>
+  <p>Prospective clients with no account can submit a "Request Services" form with name, email, phone, ID number, service type, description, and urgency. These appear in the Manager's client requests queue.</p>
+
+  <div class="divider"></div>
+
+  <!-- 14 -->
+  <h2 id="trust-overview">14. Trust Account — Overview &amp; Alert Banners</h2>
+  <p>A complete <strong>Legal Practice Act-compliant trust accounting system</strong>. Available in the Attorney, Manager, and Bookkeeper dashboards. Attorneys see only their own matters; Manager and Bookkeeper see all matters across all branches.</p>
+  <h4>8 Sub-tabs</h4>
+  <div style="margin:12px 0 20px">
+    <span class="subtab subtab-active">📊 Ledger</span>
+    <span class="subtab">⬇ Receipt</span>
+    <span class="subtab">⬆ Payment</span>
+    <span class="subtab">↔ Transfer</span>
+    <span class="subtab">🔁 Reconciliation</span>
+    <span class="subtab">📋 Reports</span>
+    <span class="subtab">✅ Approvals</span>
+    <span class="subtab">⚙ Settings</span>
+  </div>
+  <h4>Alert banners — always visible at the top of every sub-tab</h4>
+  <div class="alert-box alert-yellow">⏳ 3 payments pending approval — R 187,500.00 &nbsp; [Review →]</div>
+  <div class="alert-box alert-red">⚠ Low balance: Smith Matter — R 2,000.00 below minimum R 5,000.00</div>
+  <div class="alert-box alert-green">✓ Receipt TRR-008 posted — R 15,000.00 credited to John Smith</div>
+  <p>The Approvals tab button also shows a yellow dot badge with the count of pending payments.</p>
+
+  <!-- 15 -->
+  <h2 id="trust-ledger">15. Ledger Sub-tab (📊)</h2>
+  <p>The default view when Trust opens. Master overview of all trust money held.</p>
+  <h4>Summary cards</h4>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="lbl">Total trust held</div><div class="val">R 1,247,500.00</div></div>
+    <div class="stat-box"><div class="lbl">Total receipts</div><div class="val neutral">R 2,100,000.00</div></div>
+    <div class="stat-box"><div class="lbl">Total payments</div><div class="val red">R 652,500.00</div></div>
+    <div class="stat-box"><div class="lbl">Total transferred</div><div class="val blue">R 200,000.00</div></div>
+  </div>
+  <h4>Branch filter</h4>
+  <p>"All branches" button + one button per branch — filters the table below.</p>
+  <h4>All matters table</h4>
+  <table>
+    <thead><tr><th>Column</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Matter ID</td><td>Purple monospace text</td></tr>
+      <tr><td>Client</td><td>Client name</td></tr>
+      <tr><td>Description</td><td>Matter name/description</td></tr>
+      <tr><td>Branch</td><td>Branch name</td></tr>
+      <tr><td>Balance</td><td>Green if positive, red if negative, grey if zero</td></tr>
+      <tr><td>Alert</td><td>⚠ Low badge (red) if below alert threshold, Monitored (grey) if alert set but OK</td></tr>
+      <tr><td>Actions</td><td><strong>Ledger</strong> — expands running ledger below the row. <strong>Statement</strong> — opens print popup.</td></tr>
+    </tbody>
+  </table>
+  <h4>Running ledger (per matter — expanded)</h4>
+  <p>Clicking Ledger on any matter shows every posted transaction in date order: Date · Type badge (receipt=green / payment=red / transfer=blue) · Receipt No · Reference · Narration · Debit · Credit · Running balance. Balance column turns red if it goes negative. Grand total row at the bottom shows total trust held across all matters.</p>
+
+  <!-- 16 -->
+  <h2 id="trust-receipt">16. Receipt Sub-tab (⬇)</h2>
+  <p>Post money received into trust. Split layout — form left, recent receipts table right.</p>
+  <p>The form header shows the next auto-generated receipt number (e.g., <strong>Next: TRR-009</strong>) — found by taking the highest existing TRR-XXX number and adding 1.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Required</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Date</td><td>Yes</td><td>Date picker. "⚠ Period locked" warning if date is in a locked month — Post button disabled.</td></tr>
+      <tr><td>Amount (ZAR)</td><td>Yes</td><td>Numeric. Non-numeric characters stripped on blur.</td></tr>
+      <tr><td>Matter</td><td>Yes</td><td>Dropdown: "Matter ID — Client name". All matters in the system.</td></tr>
+      <tr><td>Trust bank account</td><td>No</td><td>Dropdown of active trust bank accounts.</td></tr>
+      <tr><td>Branch</td><td>Auto</td><td>Read-only — auto-filled from the attorney's assigned branch.</td></tr>
+      <tr><td>Reference</td><td>No</td><td>EFT reference or cheque number.</td></tr>
+      <tr><td>Received from</td><td>No</td><td>Payer name.</td></tr>
+      <tr><td>Narration</td><td>Yes</td><td>Free text description.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>On post:</strong> Inserts into <code>trust_transactions</code> with <code>type='receipt'</code>, <code>status='posted'</code>, auto-generated receipt number. Form fields clear (date and account keep their values). Success toast confirms the receipt number, amount, and client name.</p>
+
+  <!-- 17 -->
+  <h2 id="trust-payment">17. Payment Sub-tab (⬆)</h2>
+  <p>Pay money out of trust. The most guarded transaction — enforces balance checks and approval thresholds.</p>
+  <div class="alert-box alert-yellow">⚠ R50,000 approval threshold: any payment at or above R50,000 is saved as <strong>status='pending'</strong> and routed to the Approvals sub-tab. The Post button label changes to "Submit for approval". A manager must approve before the money moves.</div>
+  <table>
+    <thead><tr><th>Field</th><th>Required</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Date</td><td>Yes</td><td>Date picker with period lock check.</td></tr>
+      <tr><td>Amount (ZAR)</td><td>Yes</td><td>Numeric input.</td></tr>
+      <tr><td>Matter</td><td>Yes</td><td>Dropdown showing current trust balance per matter: "M001 — John Smith (bal: R 46,500.00)"</td></tr>
+      <tr><td>Trust bank account</td><td>No</td><td>Dropdown of trust accounts.</td></tr>
+      <tr><td>Branch</td><td>Auto</td><td>Auto-filled from attorney's branch.</td></tr>
+      <tr><td>Payee</td><td>Yes</td><td>Who receives payment: sheriff, advocate, municipality, etc.</td></tr>
+      <tr><td>Reference</td><td>No</td><td>Cheque or EFT reference.</td></tr>
+      <tr><td>Narration</td><td>Yes</td><td>Description of the payment.</td></tr>
+    </tbody>
+  </table>
+  <h4>Live balance check</h4>
+  <div class="alert-box alert-green">✓ Available: R 46,500.00 · After: R 43,000.00</div>
+  <div class="alert-box alert-yellow">✓ Available: R 75,000.00 · After: R 22,000.00 · ⏳ Needs partner approval (≥ R50,000)</div>
+  <div class="alert-box alert-red">✗ Insufficient — available: R 5,000.00, shortfall: R 3,000.00. Payment blocked.</div>
+  <p>A red balance check locks the Post button — the payment cannot proceed at all if funds are insufficient.</p>
+
+  <!-- 18 -->
+  <h2 id="trust-transfer">18. Transfer Sub-tab (↔)</h2>
+  <p>Moves earned professional fees from a trust account to the firm's business account. This is a legal requirement — trust and business funds must never be mixed.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Date</td><td>Date picker with period lock check.</td></tr>
+      <tr><td>Amount (ZAR)</td><td>Amount excluding VAT. System adds 15% VAT automatically.</td></tr>
+      <tr><td>Matter</td><td>Dropdown with current trust balance shown per matter.</td></tr>
+      <tr><td>Link to invoice</td><td>Optional. Auto-fills narration with invoice reference.</td></tr>
+      <tr><td>From trust account</td><td>Dropdown of trust bank accounts.</td></tr>
+      <tr><td>To business account</td><td>FNB Business Account or ABSA Business Account.</td></tr>
+      <tr><td>Narration</td><td>Description (auto-filled if invoice linked).</td></tr>
+    </tbody>
+  </table>
+  <h4>Live VAT balance check</h4>
+  <div class="card" style="font-size:12px">
+    <div style="color:#6CC04A">✓ Available: R 46,500.00</div>
+    <div style="color:#888;margin-top:6px">Excl. VAT: R 10,000.00 + VAT 15%: R 1,500.00 = <strong style="color:#EAB308">Total from trust: R 11,500.00</strong></div>
+    <div style="color:#555;margin-top:4px">After transfer: R 35,000.00</div>
+  </div>
+  <p>The system deducts <strong>amount × 1.15</strong> from trust (trust holds VAT-inclusive amounts). Both legs post automatically — no second entry needed. Transfer history table on the right shows all past transfers.</p>
+
+  <!-- 19 -->
+  <h2 id="trust-recon">19. Reconciliation Sub-tab (🔁)</h2>
+  <p>Monthly bank statement reconciliation — a legal compliance requirement. Compare the bank's records against the system's records.</p>
+  <h4>Summary cards</h4>
+  <div class="stat-grid-3">
+    <div class="stat-box"><div class="lbl">System trust balance</div><div class="val blue">R 1,247,500.00</div></div>
+    <div class="stat-box"><div class="lbl">Bank statement total</div><div class="val neutral">R 1,247,500.00</div></div>
+    <div class="stat-box"><div class="lbl">Difference</div><div class="val">R 0.00 ✓ Reconciled</div></div>
+  </div>
+  <h4>Period management — month-end lock</h4>
+  <p>Select a month (e.g. <code>2026-06</code>). Toggle its status:</p>
+  <ul>
+    <li><strong>Open:</strong> Orange "🔒 Lock period" button — locks all entries for that month across the entire system</li>
+    <li><strong>Locked:</strong> Red "Unlock" button with confirm dialog — should only be done with partner authorisation</li>
+  </ul>
+  <p>When a period is locked, the Receipt, Payment, and Transfer forms all show "⚠ Period locked" and disable their Post buttons for any date in that month. All currently locked periods are listed on screen.</p>
+  <h4>CSV import</h4>
+  <p>Supports FNB, ABSA, Standard Bank, and Nedbank CSV exports. Parser handles DD/MM/YYYY and YYYY-MM-DD formats. Negative amounts = debits. Manual line-by-line entry is also available.</p>
+  <h4>Side-by-side matching</h4>
+  <ul>
+    <li><strong>Left column — Bank statement lines:</strong> Each line has a checkbox. Tick to mark as matched (greyed out with strikethrough). Delete button to remove a line.</li>
+    <li><strong>Right column — System transactions:</strong> All posted receipts and payments. Checkbox to mark as matched.</li>
+  </ul>
+  <p>Unmatched items on either side drive the difference shown in the summary cards.</p>
+  <h4>Reconciliation certificate</h4>
+  <p>"Print certificate" generates a formal document with: bank balance, system balance, difference, matched item count, period lock status, and two signature blocks (Bookkeeper + Partner/Director). Auto-triggers the browser print dialog.</p>
+
+  <!-- 20 -->
+  <h2 id="trust-reports">20. Reports Sub-tab (📋)</h2>
+  <p>Four formal financial reports. All filtered by branch and date range.</p>
+  <table>
+    <thead><tr><th>Report</th><th>What it contains</th></tr></thead>
+    <tbody>
+      <tr><td>Trial Balance</td><td>Every matter with its current trust balance. Grand total at bottom must equal the bank balance. Zero-balance matters shown at 40% opacity.</td></tr>
+      <tr><td>Receipts Journal</td><td>All receipts in range: receipt number, date, matter, client, received from, branch, narration, amount. Total row at bottom.</td></tr>
+      <tr><td>Payments Journal</td><td>All payments: date, matter, client, payee, branch, status badge, narration, amount. Total at bottom.</td></tr>
+      <tr><td>Transfers Journal</td><td>All transfers: date, matter, client, from trust account, to business account, linked invoice, amount. Total at bottom.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 21 -->
+  <h2 id="trust-approvals">21. Approvals Sub-tab (✅)</h2>
+  <p>Partner/manager review queue for payments ≥ R50,000. Yellow badge on the tab shows the count of pending items.</p>
+  <p><strong>Empty state:</strong> "✅ No payments pending approval"</p>
+  <h4>Each pending payment card shows</h4>
+  <ul>
+    <li><span class="badge badge-yellow">PENDING APPROVAL</span> badge · date · branch</li>
+    <li>Amount in large yellow text</li>
+    <li>Payee name, matter ID, client name, narration</li>
+    <li>Balance box: "Available: R 120,000.00 · After approval: R 45,000.00" — turns red if balance would go negative</li>
+  </ul>
+  <h4>Actions by role</h4>
+  <ul>
+    <li><strong>Attorney:</strong> Read-only. Shows "⏳ Awaiting manager approval". No buttons.</li>
+    <li><strong>Manager:</strong> <strong>Approve</strong> — posts immediately, records approver ID + timestamp. <strong>Reject</strong> — prompts for reason, sets status to rejected.</li>
+  </ul>
+
+  <!-- 22 -->
+  <h2 id="trust-settings">22. Trust Settings Sub-tab (⚙)</h2>
+  <h4>Left panel — Low balance alerts</h4>
+  <ul>
+    <li>Select a matter + set a minimum balance threshold (default R5,000) + click Save</li>
+    <li>One alert per matter (saving again updates the threshold)</li>
+    <li>Active alerts listed with client name, threshold, current balance (green/red), and Remove button</li>
+    <li>When a balance drops below the threshold, a red warning banner appears at the top of every Trust sub-tab</li>
+  </ul>
+  <h4>Right panel — Branch trust overview</h4>
+  <p>One card per branch showing: branch name, total trust balance (blue), total receipts (green), total payments (red), transaction count (grey).</p>
+
+  <!-- 23 -->
+  <h2 id="trust-flow">23. Data Flow &amp; Architecture</h2>
+  <div class="flow">
+    <div><span>Client pays fees</span> → Attorney posts Receipt → trust_transactions (type='receipt', status='posted')</div>
+    <div><span>Fees earned</span>    → Attorney posts Transfer → trust_transactions (type='transfer', status='posted')</div>
+    <div><span>Costs to pay</span>   → Attorney posts Payment → amount &lt; R50k → status='posted' immediately</div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ amount ≥ R50k → status='pending' → Manager approves → status='posted'</div>
+    <div><span>Month-end</span>       → Bookkeeper imports bank CSV → matches → prints certificate → locks period</div>
+    <div><span>Audit</span>          → Reports tab → Trial Balance / Receipts / Payments / Transfers journals</div>
+  </div>
+  <h4>Key technical facts</h4>
+  <ul>
+    <li><strong>No stored balance column.</strong> Balances are calculated live by summing all posted receipts minus all posted payments per matter. This means the ledger is always accurate and cannot drift out of sync.</li>
+    <li><strong>Period locks</strong> are stored in <code>trust_period_locks</code> as YYYY-MM strings. The application checks this on every form submit — locked periods block posting at the app level.</li>
+    <li><strong>Receipt numbering</strong> is sequential: <code>TRR-001, TRR-002…</code> — calculated from the current MAX, no gaps.</li>
+    <li><strong>Approval threshold</strong> is hardcoded at R50,000. All payments at or above this amount are always routed to pending, regardless of who submits them.</li>
+    <li><strong>VAT on transfers:</strong> Trust holds VAT-inclusive amounts. Transfers deduct amount × 1.15 from trust; the firm keeps the net amount as professional fees.</li>
+    <li><strong>Multi-branch:</strong> Every transaction records a <code>branch_id</code>. All reports, the trial balance, and the settings branch overview can be filtered per branch.</li>
+    <li><strong>Refresh rates:</strong> Attorney trust auto-refreshes every 5 minutes. Manager trust refreshes every 30 seconds.</li>
+  </ul>
+
+  <div class="divider"></div>
+  <p style="text-align:center;font-size:11px;color:#2A2A2A">MB SmartTrack — Full System Documentation &nbsp;·&nbsp; Generated 08 June 2026 &nbsp;·&nbsp; Confidential</p>
+
+</div>
+</body>
+</html>

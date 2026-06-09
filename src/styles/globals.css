@@ -122,8 +122,78 @@ html, body {
 .stat-card {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-
 .stat-card:hover {
   border-color: rgba(108, 192, 74, 0.3);
   box-shadow: 0 0 20px rgba(108, 192, 74, 0.05);
 }
+
+/* ── MB Design System ─────────────────────────────────── */
+
+/* Layout */
+.mb-page  { background: #0A0A0A; min-height: 100vh; font-family: 'DM Sans', system-ui, sans-serif; color: #F0F0F0; }
+.mb-main  { max-width: 1300px; margin: 0 auto; padding: 20px 24px; }
+
+/* Cards */
+.mb-card  { background: #111; border: 1px solid #1A1A1A; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+.mb-card-0 { background: #111; border: 1px solid #1A1A1A; border-radius: 8px; padding: 16px; }
+
+/* Stat cards */
+.mb-stat       { background: #111; border: 1px solid #1A1A1A; border-radius: 8px; padding: 14px; }
+.mb-stat-accent{ background: rgba(141,198,63,0.05); border: 1px solid rgba(141,198,63,0.25); border-radius: 8px; padding: 14px; }
+.mb-stat-warn  { background: rgba(234,179,8,0.05);  border: 1px solid rgba(234,179,8,0.25);  border-radius: 8px; padding: 14px; }
+
+/* Buttons */
+.mb-btn       { background: transparent; border: 1px solid #252525; color: #888; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; font-weight: 500; transition: opacity 0.15s; }
+.mb-btn:hover { opacity: 0.85; }
+.mb-btn-primary { background: #8DC63F; border: none; color: #0A0A0A; font-weight: 700; }
+.mb-btn-danger  { background: rgba(220,80,80,0.15); border: 1px solid rgba(220,80,80,0.4); color: #E05252; }
+.mb-btn-warn    { background: rgba(234,179,8,0.15);  border: 1px solid rgba(234,179,8,0.4); color: #EAB308; }
+.mb-btn-sm      { padding: 3px 8px; font-size: 10px; }
+
+/* Table cells */
+.mb-th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #444; padding: 9px 10px; border-bottom: 1px solid #181818; text-align: left; font-weight: 600; }
+.mb-td { padding: 9px 10px; font-size: 11px; border-bottom: 1px solid #161616; vertical-align: middle; }
+.mb-table { width: 100%; border-collapse: collapse; }
+.mb-table tr:hover td { background: rgba(141,198,63,0.025); }
+
+/* Select / input */
+.mb-sel  { background: #1A1A1A; border: 1px solid #252525; color: #F0F0F0; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-family: inherit; }
+.mb-field { background: #1A1A1A; border: 1px solid #252525; color: #F0F0F0; padding: 9px 12px; border-radius: 6px; font-size: 12px; font-family: inherit; width: 100%; box-sizing: border-box; }
+.mb-field:focus { outline: 1px solid rgba(141,198,63,0.5); border-color: rgba(141,198,63,0.4); }
+.mb-field option { background: #1A1A1A; color: #F0F0F0; }
+
+/* Label */
+.mb-lbl { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; display: block; }
+
+/* Tab nav button */
+.mb-ntab        { background: transparent; border: 1px solid transparent; color: #555; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; font-weight: 400; }
+.mb-ntab.active { border-color: #2A2A2A; color: #F0F0F0; font-weight: 600; }
+
+/* Live indicator */
+.mb-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(141,198,63,0.08); border: 1px solid rgba(141,198,63,0.2); border-radius: 20px; padding: 4px 12px; font-size: 11px; color: #8DC63F; }
+.mb-dot  { width: 7px; height: 7px; border-radius: 50%; background: #8DC63F; box-shadow: 0 0 6px rgba(141,198,63,0.8); flex-shrink: 0; }
+
+/* Modal overlay */
+.mb-overlay    { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.mb-modal-box  { background: #111; border: 1px solid #2A2A2A; border-radius: 12px; padding: 28px; width: 100%; }
+
+/* Alert / banner */
+.mb-alert-success { background: rgba(141,198,63,0.1); border: 1px solid rgba(141,198,63,0.3); color: #8DC63F; padding: 14px 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.mb-alert-error   { background: rgba(220,80,80,0.1);  border: 1px solid rgba(220,80,80,0.4);  color: #E05252; padding: 14px 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.mb-alert-warn    { background: rgba(234,179,8,0.1);   border: 1px solid rgba(234,179,8,0.3);   color: #EAB308; padding: 10px 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+
+/* Status badges */
+.mb-badge { display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 20px; font-weight: 600; text-transform: capitalize; }
+
+/* Section heading */
+.mb-heading { font-size: 16px; font-weight: 700; letter-spacing: -0.03em; }
+.mb-sub     { font-size: 11px; color: #444; }
+
+/* Stat label / value helpers */
+.mb-stat-label { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 8px; }
+.mb-stat-value { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.mb-stat-note  { font-size: 10px; color: #444; }
+
+/* Progress bar */
+.mb-progress-track { flex: 1; height: 6px; background: #1A1A1A; border-radius: 3px; overflow: hidden; }
+.mb-progress-fill  { height: 100%; border-radius: 3px; transition: width 0.3s; }
