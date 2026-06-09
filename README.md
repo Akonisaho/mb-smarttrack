@@ -316,4 +316,4 @@ Built for **Motsoeneng Bill** — a South African law firm operating across mult
 
 ## License
 
-Proprietary. All rights reserved — Motsoeneng Bill Attorneys © 2025.
+Proprietary. All rights reserved — Motsoeneng Bill © 2026.
