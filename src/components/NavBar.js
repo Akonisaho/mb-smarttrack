@@ -78,6 +78,7 @@ const NAV = {
   hr: [
     { type:'item', label:'Staff', id:'staff' },
     { type:'item', label:'Performance', id:'performance' },
+    { type:'item', label:'Analytics', id:'analytics' },
     { type:'item', label:'Leave', id:'leave' },
     { type:'item', label:'Payroll', id:'payroll' },
   ],

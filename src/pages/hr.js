@@ -1,12 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { supabase, getProfile, signOut, fetchAllProfiles } from '../lib/supabase';
+import { supabase, getProfile, signOut, fetchAllProfiles, fetchPerformanceFeedback, savePerformanceFeedback, fetchPerformanceReviews, openPerformanceReview, closePerformanceReview } from '../lib/supabase';
 import NavBar from '../components/NavBar';
 import { SkeletonDashboard } from '../components/Skeleton';
 
 function toHm(s){ s=Number(s)||0; if(s<=0)return'0m'; const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; }
 function fmtR(n){ return 'R '+Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+function BarChart({ data, height=130 }) {
+  if (!data||!data.length) return <div style={{fontSize:11,color:'#333',textAlign:'center',padding:20}}>No data</div>;
+  const max = Math.max(...data.map(d=>d.value), 1);
+  return (
+    <div style={{display:'flex',alignItems:'flex-end',gap:3,height,padding:'0 2px'}}>
+      {data.map((d,i)=>(
+        <div key={i} title={`${d.label}: ${d.value}`} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+          <div style={{fontSize:8,color:'#777',fontWeight:600}}>{d.value>999?(d.value/1000).toFixed(1)+'k':d.value}</div>
+          <div style={{width:'100%',background:d.color||'#8DC63F',borderRadius:'2px 2px 0 0',height:Math.max(Math.round((d.value/max)*(height-36)),2)}}/>
+          <div style={{fontSize:7,color:'#444',textAlign:'center',width:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingTop:2}}>{d.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const TITLES = ['','Partner','Senior Attorney','Attorney','Associate Attorney','Candidate Attorney','Conveyancer','Bookkeeper','Receptionist','HR Manager','Other'];
 const PERIODS = [
@@ -41,6 +57,17 @@ export default function HRDashboard() {
   const [leaveFilter, setLeaveFilter] = useState('all');
   // Payroll
   const [payMonth, setPayMonth] = useState(new Date().toLocaleDateString('en-CA').substring(0,7));
+  // Performance feedback thread
+  const [pfeedback, setPfeedback] = useState([]);
+  const [selAttyDetail, setSelAttyDetail] = useState(null);
+  const [pfMsg, setPfMsg] = useState('');
+  const [pfType, setPfType] = useState('general');
+  const [sendingPf, setSendingPf] = useState(false);
+  // Review cycles
+  const [reviews, setReviews] = useState([]);
+  const [showOpenReview, setShowOpenReview] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ period:'', due_date:'', instructions:'' });
+  const [savingReview, setSavingReview] = useState(false);
 
   function showMsg(msg, type='success') { setAlert({ msg, type }); setTimeout(() => setAlert({ msg:'', type:'' }), 5000); }
 
@@ -76,6 +103,12 @@ export default function HRDashboard() {
 
     const { data: lv } = await supabase.from('leave_requests').select('*, profiles!leave_requests_staff_id_fkey(full_name,role,branch_id)').order('created_at', { ascending:false });
     setLeaveRequests(lv || []);
+
+    const { feedback: pf } = await fetchPerformanceFeedback({});
+    setPfeedback(pf || []);
+
+    const { reviews: rv } = await fetchPerformanceReviews();
+    setReviews(rv || []);
   }, []);
 
   useEffect(() => { if (!loading) load(); }, [loading, load]);
@@ -93,11 +126,16 @@ export default function HRDashboard() {
     const tgt = (atty.monthly_target || 0) * 6;
     const pct = tgt > 0 ? Math.round(units / tgt * 100) : null;
     const util = totalSec > 0 ? Math.round(billSec / totalSec * 100) : 0;
-    const attyFb = feedback.filter(f => f.subject_id === atty.id && f.period === period.label);
+    const allFb = feedback.filter(f => f.subject_id === atty.id && f.period === period.label);
+    const hrFb   = allFb.filter(f => f.reviewer_type === 'hr' || !f.reviewer_type);
+    const selfFb = allFb.filter(f => f.reviewer_type === 'self');
+    const peerFb = allFb.filter(f => f.reviewer_type === 'peer');
     const attyRatings = satisfaction.filter(s => s.attorney_id === atty.id);
-    const avgOverall = attyFb.length ? (attyFb.reduce((s, f) => s + (f.overall_score || 0), 0) / attyFb.length).toFixed(1) : null;
+    const avgOverall = hrFb.length   ? (hrFb.reduce((s,f)   => s + (f.overall_score||0), 0) / hrFb.length).toFixed(1)   : null;
+    const avgPeer    = peerFb.length ? (peerFb.reduce((s,f) => s + (f.overall_score||0), 0) / peerFb.length).toFixed(1) : null;
+    const selfAssess = selfFb[0] || null;
     const avgSat = attyRatings.length ? (attyRatings.reduce((s, r) => s + r.rating, 0) / attyRatings.length).toFixed(1) : null;
-    return { units, billSec, totalSec, invAmt, tgt, pct, util, attyFb, avgOverall, avgSat, attyRatings };
+    return { units, billSec, totalSec, invAmt, tgt, pct, util, attyFb: allFb, hrFb, selfFb, peerFb, avgOverall, avgPeer, selfAssess, avgSat, attyRatings };
   }
 
   async function handleSaveLeave() {
@@ -148,6 +186,45 @@ export default function HRDashboard() {
     setShowFeedbackForm(false);
     setFbForm({ subject_id:'', billing_score:0, client_score:0, teamwork_score:0, knowledge_score:0, overall_score:0, comments:'', is_anonymous:false });
     load();
+  }
+
+  async function handleOpenReview() {
+    if (!reviewForm.period) { showMsg('Select a period.', 'error'); return; }
+    setSavingReview(true);
+    const { error } = await openPerformanceReview({ ...reviewForm, opened_by: profile.id, status: 'open' });
+    setSavingReview(false);
+    if (error) { showMsg('Error: ' + error.message, 'error'); return; }
+    showMsg('✓ Review cycle opened — attorneys will be notified.');
+    setShowOpenReview(false);
+    load();
+  }
+
+  async function handleCloseReview(id) {
+    if (!confirm('Close this review cycle? Attorneys will no longer see the self-assessment prompt.')) return;
+    const { error } = await closePerformanceReview(id);
+    if (error) { showMsg('Error: ' + error.message, 'error'); return; }
+    showMsg('✓ Review cycle closed.');
+    load();
+  }
+
+  async function handleSendPf(toUserId) {
+    if (!pfMsg.trim()) return;
+    setSendingPf(true);
+    const { error } = await savePerformanceFeedback({
+      from_user_id: profile.id,
+      to_user_id: toUserId,
+      message: pfMsg.trim(),
+      type: pfType,
+      period: period.label,
+      from_name: profile.full_name,
+      is_read: false,
+    });
+    setSendingPf(false);
+    if (error) { showMsg('Error: ' + error.message, 'error'); return; }
+    showMsg('✓ Feedback sent.');
+    setPfMsg('');
+    const { feedback: pf } = await fetchPerformanceFeedback({});
+    setPfeedback(pf || []);
   }
 
   function copyReview(atty, stats) {
@@ -232,6 +309,64 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
             <button style={C.btn('p')} onClick={()=>{setFbForm({subject_id:'',billing_score:0,client_score:0,teamwork_score:0,knowledge_score:0,overall_score:0,comments:'',is_anonymous:false});setShowFeedbackForm(true);}}>+ Add HR Feedback</button>
           </div>
         </div>
+
+        {/* ── Review Cycle Status ── */}
+        {(()=>{
+          const active = reviews.find(r=>r.status==='open');
+          const selfSubmissions = feedback.filter(f=>f.reviewer_type==='self'&&f.period===(active?.period||period.label));
+          const submittedIds = new Set(selfSubmissions.map(f=>f.subject_id));
+          return(<div style={{...C.card,marginBottom:16}}>
+            {active ? (<>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#D0D0D0',display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{width:8,height:8,borderRadius:'50%',background:'#8DC63F',display:'inline-block',boxShadow:'0 0 6px #8DC63F'}}/>
+                    Review Open — {active.period}
+                  </div>
+                  <div style={{fontSize:11,color:'#555',marginTop:4}}>
+                    Due: <strong style={{color:'#EAB308'}}>{active.due_date ? new Date(active.due_date+'T12:00:00').toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'}) : 'No deadline'}</strong>
+                    {active.instructions&&<span style={{marginLeft:12,color:'#444',fontStyle:'italic'}}>"{active.instructions}"</span>}
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <span style={{fontSize:11,color:'#555'}}>{submittedIds.size} / {attorneys.length} self-assessments</span>
+                  <button style={{...C.btn('r'),fontSize:11}} onClick={()=>handleCloseReview(active.id)}>Close Review</button>
+                </div>
+              </div>
+              {attorneys.length>0&&(<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>
+                {attorneys.map(a=>{
+                  const done=submittedIds.has(a.id);
+                  return(<span key={a.id} style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:done?'rgba(141,198,63,0.1)':'rgba(234,179,8,0.07)',color:done?'#8DC63F':'#EAB308',border:`1px solid ${done?'rgba(141,198,63,0.25)':'rgba(234,179,8,0.18)'}`}}>
+                    {done?'✓':'⏳'} {a.full_name.split(' ')[0]}
+                  </span>);
+                })}
+              </div>)}
+              {/* Peer review progress by branch */}
+              {branches.filter(b=>attorneys.filter(a=>a.branch_id===b.id).length>1).map(b=>{
+                const bAttys=attorneys.filter(a=>a.branch_id===b.id);
+                const peerForBranch=feedback.filter(f=>f.reviewer_type==='peer'&&f.period===active.period&&bAttys.some(a=>a.id===f.subject_id));
+                const pairs=new Set(peerForBranch.map(f=>`${f.reviewer_id}-${f.subject_id}`)).size;
+                const expected=bAttys.length*(bAttys.length-1);
+                const pp=expected>0?Math.round(pairs/expected*100):0;
+                const pc=pp>=100?'#8DC63F':pp>=50?'#EAB308':'#E05252';
+                return(<div key={b.id} style={{marginTop:8,padding:'8px 12px',background:'#0D0D0D',borderRadius:6}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                    <span style={{fontSize:11,color:'#888',fontWeight:600}}>{b.name} — Peer Reviews</span>
+                    <span style={{fontSize:11,color:pc,fontWeight:700}}>{pairs}/{expected} pairs · {pp}%</span>
+                  </div>
+                  <div style={{height:4,background:'#1A1A1A',borderRadius:2}}><div style={{width:`${Math.min(pp,100)}%`,height:'100%',background:pc,borderRadius:2,transition:'width .4s'}}/></div>
+                </div>);
+              })}
+            </>) : (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:'#888'}}>No active review cycle</div>
+                <div style={{fontSize:11,color:'#444',marginTop:2}}>Open a cycle to request self-assessments from all attorneys</div>
+              </div>
+              <button style={C.btn('p')} onClick={()=>{setReviewForm({period:period.label,due_date:'',instructions:''});setShowOpenReview(true);}}>Open Review Cycle</button>
+            </div>)}
+          </div>);
+        })()}
+
         {attorneys.map(atty => {
           const stats = getAttyStats(atty);
           const br = branches.find(b => b.id === atty.branch_id);
@@ -260,15 +395,165 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
               <div style={{background:'#0D0D0D',borderRadius:8,padding:14}}>
                 <div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:10}}>360° Feedback — {period.label}</div>
                 {stats.attyFb.length===0&&stats.attyRatings.length===0?(<div style={{fontSize:11,color:'#333',textAlign:'center',padding:'10px 0'}}>No feedback yet for this period</div>):(<>
-                  {stats.avgOverall&&<div style={{marginBottom:8}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>HR Assessment</div><div style={{display:'flex',alignItems:'center',gap:6}}><div style={{fontSize:20,fontWeight:800,color:'#A78BFA'}}>{stats.avgOverall}</div><div style={{fontSize:11,color:'#555'}}>/5 · {stats.attyFb.length} review{stats.attyFb.length!==1?'s':''}</div></div></div>}
-                  {stats.avgSat&&<div><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Client Satisfaction</div><div style={{display:'flex',alignItems:'center',gap:6}}><div style={{fontSize:20,fontWeight:800,color:'#F59E0B'}}>{stats.avgSat}</div><div style={{fontSize:11,color:'#555'}}>/5 · {stats.attyRatings.length} client{stats.attyRatings.length!==1?'s':''}</div><div>{'★'.repeat(Math.round(Number(stats.avgSat)))}</div></div></div>}
-                  {stats.attyFb.map(f=>(<div key={f.id} style={{marginTop:8,padding:'8px 10px',background:'#111',borderRadius:6,fontSize:11}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}><span style={{color:'#555'}}>{f.is_anonymous?'Anonymous (HR)':f.profiles?.full_name}</span><span style={{color:'#A78BFA',fontWeight:700}}>Overall: {f.overall_score}/5</span></div>{f.comments&&<div style={{color:'#888',fontStyle:'italic'}}>"{f.comments}"</div>}</div>))}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    {stats.avgOverall&&<div style={{background:'#111',borderRadius:6,padding:'8px 10px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>HR Assessment</div><div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:18,fontWeight:800,color:'#A78BFA'}}>{stats.avgOverall}</span><span style={{fontSize:10,color:'#555'}}>/5 · {stats.hrFb.length}</span></div></div>}
+                    {stats.avgPeer&&<div style={{background:'#111',borderRadius:6,padding:'8px 10px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Peer Reviews</div><div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:18,fontWeight:800,color:'#4A90D9'}}>{stats.avgPeer}</span><span style={{fontSize:10,color:'#555'}}>/5 · {stats.peerFb.length} peer{stats.peerFb.length!==1?'s':''}</span></div></div>}
+                    {stats.selfAssess&&<div style={{background:'#111',borderRadius:6,padding:'8px 10px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Self-Assessment</div><div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:18,fontWeight:800,color:'#8DC63F'}}>{stats.selfAssess.overall_score}</span><span style={{fontSize:10,color:'#555'}}>/5 self</span></div></div>}
+                    {stats.avgSat&&<div style={{background:'#111',borderRadius:6,padding:'8px 10px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:2}}>Client Satisfaction</div><div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:18,fontWeight:800,color:'#F59E0B'}}>{stats.avgSat}</span><span style={{fontSize:10,color:'#555'}}>/5 · {stats.attyRatings.length}</span></div></div>}
+                  </div>
+                  {stats.hrFb.map(f=>(<div key={f.id} style={{marginTop:6,padding:'7px 10px',background:'#111',borderRadius:6,fontSize:11}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}><span style={{color:'#555',fontSize:10}}>{f.is_anonymous?'Anonymous (HR)':f.profiles?.full_name}</span><span style={{color:'#A78BFA',fontWeight:700}}>Overall: {f.overall_score}/5</span></div>{f.comments&&<div style={{color:'#777',fontStyle:'italic',fontSize:10}}>"{f.comments}"</div>}</div>))}
                 </>)}
               </div>
             </div>
+            {/* Detail & Feedback Thread */}
+            <div style={{borderTop:'1px solid #1A1A1A',marginTop:12,paddingTop:10,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <button style={{...C.btn(),fontSize:11}} onClick={()=>setSelAttyDetail(selAttyDetail===atty.id?null:atty.id)}>{selAttyDetail===atty.id?'▲ Hide Detail':'▼ View Detail & Feedback'}</button>
+              {pfeedback.filter(f=>f.to_user_id===atty.id).length>0&&<span style={{fontSize:10,color:'#A78BFA'}}>{pfeedback.filter(f=>f.to_user_id===atty.id).length} message(s) in thread</span>}
+            </div>
+            {selAttyDetail===atty.id&&(()=>{
+              const attyPf=pfeedback.filter(f=>f.to_user_id===atty.id);
+              const TC={commendation:'#8DC63F',concern:'#E05252',action_required:'#EAB308',general:'#555'};
+              const leaveDays=(type)=>leaveRequests.filter(l=>l.staff_id===atty.id&&l.status==='approved'&&l.type===type).reduce((s,l)=>s+(l.days||0),0);
+              return(<div style={{marginTop:12,background:'#0A0A0A',borderRadius:8,padding:16}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>
+                  {[{l:'Annual leave taken',v:leaveDays('annual')+' days',c:'#8DC63F'},{l:'Sick leave taken',v:leaveDays('sick')+' days',c:'#E05252'},{l:'Client ratings',v:stats.attyRatings.length,c:'#F59E0B'}].map(({l,v,c})=>(<div key={l} style={{background:'#111',borderRadius:6,padding:'10px 12px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:4}}>{l}</div><div style={{fontSize:15,fontWeight:700,color:c}}>{v}</div></div>))}
+                </div>
+                {stats.peerFb.length>0&&(<div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:'#D0D0D0',marginBottom:6}}>Peer Reviews — {stats.peerFb.length} received</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:8}}>
+                    {[
+                      {l:'Overall',v:stats.avgPeer+'/5',c:'#4A90D9'},
+                      {l:'Billing',v:stats.peerFb.length?(stats.peerFb.reduce((s,f)=>s+(f.billing_score||0),0)/stats.peerFb.length).toFixed(1)+'/5':'—',c:'#888'},
+                      {l:'Client',v:stats.peerFb.length?(stats.peerFb.reduce((s,f)=>s+(f.client_score||0),0)/stats.peerFb.length).toFixed(1)+'/5':'—',c:'#888'},
+                      {l:'Teamwork',v:stats.peerFb.length?(stats.peerFb.reduce((s,f)=>s+(f.teamwork_score||0),0)/stats.peerFb.length).toFixed(1)+'/5':'—',c:'#888'},
+                    ].map(({l,v,c})=>(<div key={l} style={{background:'#111',borderRadius:6,padding:'8px 10px'}}><div style={{fontSize:9,color:'#555',textTransform:'uppercase',marginBottom:3}}>{l}</div><div style={{fontSize:13,fontWeight:700,color:c}}>{v}</div></div>))}
+                  </div>
+                  {stats.peerFb.map(f=>(<div key={f.id} style={{marginBottom:4,padding:'7px 10px',background:'#111',borderRadius:6}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}><span style={{fontSize:10,color:'#555'}}>{f.is_anonymous||!f.profiles?'Anonymous Peer':f.profiles?.full_name}</span><span style={{fontSize:10,color:'#4A90D9',fontWeight:700}}>Overall: {f.overall_score}/5</span></div>{f.comments&&<div style={{fontSize:10,color:'#777',fontStyle:'italic'}}>"{f.comments}"</div>}</div>))}
+                </div>)}
+                <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:8}}>HR Feedback Thread</div>
+                {attyPf.length===0
+                  ?<div style={{fontSize:11,color:'#333',textAlign:'center',padding:14,borderRadius:6,background:'#111',marginBottom:12}}>No messages yet — start the conversation below</div>
+                  :<div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:12,maxHeight:240,overflowY:'auto',paddingRight:4}}>
+                    {attyPf.map(msg=>{
+                      const isHr=msg.from_user_id!==atty.id;
+                      const tc=TC[msg.type]||'#555';
+                      return(<div key={msg.id} style={{display:'flex',justifyContent:isHr?'flex-start':'flex-end'}}>
+                        <div style={{background:isHr?'#1A1A1A':'rgba(141,198,63,0.08)',border:`1px solid ${isHr?'#252525':'rgba(141,198,63,0.2)'}`,borderRadius:8,padding:'8px 12px',maxWidth:'78%'}}>
+                          <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
+                            <span style={{fontSize:9,fontWeight:700,color:isHr?'#F472B6':'#8DC63F'}}>{msg.sender?.full_name||'HR'}</span>
+                            <span style={{fontSize:9,padding:'1px 6px',borderRadius:10,background:`${tc}20`,color:tc,textTransform:'capitalize'}}>{msg.type?.replace(/_/g,' ')}</span>
+                            <span style={{fontSize:9,color:'#333',marginLeft:'auto'}}>{new Date(msg.created_at).toLocaleDateString('en-ZA',{day:'numeric',month:'short'})}</span>
+                          </div>
+                          <div style={{fontSize:11,color:'#C0C0C0',lineHeight:1.5}}>{msg.message}</div>
+                          {!msg.is_read&&isHr&&<div style={{fontSize:8,color:'#EAB308',marginTop:2}}>• Unread by attorney</div>}
+                        </div>
+                      </div>);
+                    })}
+                  </div>
+                }
+                <div style={{background:'#111',borderRadius:8,padding:12}}>
+                  <div style={{display:'flex',gap:8,marginBottom:8,alignItems:'center',flexWrap:'wrap'}}>
+                    <div style={{fontSize:11,color:'#888',fontWeight:600}}>Send to {atty.full_name.split(' ')[0]}</div>
+                    <select style={{...C.sel,marginLeft:'auto',fontSize:11}} value={pfType} onChange={e=>setPfType(e.target.value)}>
+                      {[['general','General'],['commendation','Commendation ★'],['concern','Concern ⚠'],['action_required','Action Required !']].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                  <textarea style={{...C.inp,minHeight:66,marginBottom:8}} value={pfMsg} onChange={e=>setPfMsg(e.target.value)} placeholder="Write feedback, commendation, or action item for this attorney…"/>
+                  <div style={{display:'flex',justifyContent:'flex-end'}}>
+                    <button style={C.btn('p')} disabled={sendingPf||!pfMsg.trim()} onClick={()=>handleSendPf(atty.id)}>{sendingPf?'Sending…':'Send Feedback'}</button>
+                  </div>
+                </div>
+              </div>);
+            })()}
           </div>);
         })}
       </div>)}
+
+      {/* ── ANALYTICS TAB ── */}
+      {tab==='analytics' && (()=>{
+        const attyStats = attorneys.map(atty => {
+          const stats = getAttyStats(atty);
+          const br = branches.find(b=>b.id===atty.branch_id);
+          return { atty, stats, br };
+        });
+        const sortedByUnits = [...attyStats].sort((a,b)=>b.stats.units-a.stats.units);
+        const sortedByRev   = [...attyStats].sort((a,b)=>b.stats.invAmt-a.stats.invAmt);
+        const totalUnits    = attyStats.reduce((s,x)=>s+x.stats.units, 0);
+        const totalRevenue  = attyStats.reduce((s,x)=>s+x.stats.invAmt, 0);
+        const avgUtil       = attyStats.length ? Math.round(attyStats.reduce((s,x)=>s+x.stats.util,0)/attyStats.length) : 0;
+        const onTargetN     = attyStats.filter(x=>x.stats.pct!==null&&x.stats.pct>=100).length;
+        const withTarget    = attyStats.filter(x=>x.stats.tgt>0).length;
+        const unitsBars     = sortedByUnits.slice(0,8).map(x=>({ label:x.atty.full_name.split(' ')[0], value:x.stats.units, color:x.stats.pct===null?'#555':x.stats.pct>=100?'#8DC63F':x.stats.pct>=70?'#EAB308':'#E05252' }));
+        const revBars       = sortedByRev.slice(0,8).map(x=>({ label:x.atty.full_name.split(' ')[0], value:Math.round(x.stats.invAmt/1000)*1000, color:'#4A90D9' }));
+        return (<div style={C.main}>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:16,fontWeight:700,letterSpacing:'-0.03em'}}>HR Analytics</div>
+            <div style={{fontSize:11,color:'#444'}}>Performance overview · {period.label}</div>
+          </div>
+          {/* Period selector */}
+          <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center'}}>
+            <select style={C.sel} value={selPeriod} onChange={e=>setSelPeriod(Number(e.target.value))}>
+              {PERIODS.map((p,i)=><option key={i} value={i}>{p.label}</option>)}
+            </select>
+          </div>
+          {/* Summary cards */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+            {[
+              {l:'Total Attorneys',v:attorneys.length,c:'#F0F0F0'},
+              {l:'Total Billing Units',v:totalUnits.toLocaleString(),c:'#8DC63F'},
+              {l:'Avg Utilisation',v:avgUtil+'%',c:avgUtil>=70?'#8DC63F':avgUtil>=50?'#EAB308':'#E05252'},
+              {l:'On Target',v:`${onTargetN} / ${withTarget}`,c:'#4A90D9'},
+            ].map(({l,v,c})=>(<div key={l} style={C.stat(false,false)}>
+              <div style={{fontSize:9,color:'#555',textTransform:'uppercase',letterSpacing:'.09em',marginBottom:8}}>{l}</div>
+              <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+            </div>))}
+          </div>
+          {/* Charts row */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            <div style={C.card}>
+              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Billing Units — Top Attorneys</div>
+              <BarChart data={unitsBars} height={140}/>
+              <div style={{display:'flex',gap:10,marginTop:10,fontSize:9,color:'#555',flexWrap:'wrap'}}>
+                <span style={{color:'#8DC63F'}}>■ On target</span>
+                <span style={{color:'#EAB308'}}>■ 70%+ target</span>
+                <span style={{color:'#E05252'}}>■ Below 70%</span>
+                <span style={{color:'#555'}}>■ No target set</span>
+              </div>
+            </div>
+            <div style={C.card}>
+              <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Revenue (incl. VAT)</div>
+              <BarChart data={revBars} height={140}/>
+              <div style={{fontSize:10,color:'#555',marginTop:10,textAlign:'right'}}>Total: {fmtR(totalRevenue)}</div>
+            </div>
+          </div>
+          {/* Rankings table */}
+          <div style={C.card}>
+            <div style={{fontSize:12,fontWeight:600,color:'#D0D0D0',marginBottom:12}}>Attorney Rankings · {period.label}</div>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>{['#','Attorney','Branch','Units','Target%','Util%','Revenue','360 Score','Client Sat','Signal'].map(h=><th key={h} style={C.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {sortedByUnits.map(({atty,stats,br},i)=>{
+                  const gc=stats.pct===null?'#444':stats.pct>=100?'#8DC63F':stats.pct>=70?'#EAB308':'#E05252';
+                  const medal=i===0?'#EAB308':i===1?'#888':i===2?'#CD7F32':'#333';
+                  return(<tr key={atty.id} style={{cursor:'pointer'}} onClick={()=>{setSelAttyDetail(atty.id);setTab('performance');}}>
+                    <td style={{...C.td,fontWeight:800,color:medal,textAlign:'center'}}>#{i+1}</td>
+                    <td style={{...C.td,fontWeight:600,color:'#D0D0D0'}}>{atty.full_name}</td>
+                    <td style={{...C.td,color:'#4A90D9',fontSize:10}}>{br?.name||'—'}</td>
+                    <td style={{...C.td,fontFamily:'monospace',fontWeight:700,color:gc}}>{stats.units.toLocaleString()}</td>
+                    <td style={{...C.td,fontWeight:700,color:gc}}>{stats.pct!==null?stats.pct+'%':'—'}</td>
+                    <td style={{...C.td,color:stats.util>=70?'#8DC63F':stats.util>=50?'#EAB308':'#E05252'}}>{stats.util}%</td>
+                    <td style={{...C.td,fontFamily:'monospace',color:'#8DC63F',fontSize:10}}>{fmtR(stats.invAmt)}</td>
+                    <td style={{...C.td,color:'#A78BFA',fontWeight:700}}>{stats.avgOverall||'—'}</td>
+                    <td style={{...C.td,color:'#F59E0B',fontWeight:700}}>{stats.avgSat||'—'}</td>
+                    <td style={{...C.td,fontSize:16,textAlign:'center'}}>{stats.pct===null?'—':stats.pct>=100?'↑':stats.pct>=70?'→':'↓'}</td>
+                  </tr>);
+                })}
+              </tbody>
+            </table>
+            <div style={{fontSize:10,color:'#333',marginTop:8}}>Click any row to open the attorney's detail view in the Performance tab.</div>
+          </div>
+        </div>);
+      })()}
 
       {/* ── LEAVE TAB ── */}
       {tab==='leave' && (() => {
@@ -378,6 +663,35 @@ Billable Time: ${toHm(stats.billSec)}\nUtilisation: ${stats.util}%\nRevenue: ${f
           <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
             <button style={C.btn()} onClick={()=>setShowFeedbackForm(false)}>Cancel</button>
             <button style={C.btn('p')} disabled={savingFb||!fbForm.subject_id||!fbForm.overall_score} onClick={handleSaveFeedback}>{savingFb?'Saving…':'Submit Feedback'}</button>
+          </div>
+        </div>
+      </div>)}
+
+      {/* ── OPEN REVIEW MODAL ── */}
+      {showOpenReview&&(<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={()=>setShowOpenReview(false)}>
+        <div style={{background:'#111',border:'1px solid #2A2A2A',borderRadius:12,padding:28,width:'100%',maxWidth:460}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Open Performance Review Cycle</div>
+          <div style={{fontSize:11,color:'#555',marginBottom:18}}>Attorneys will be notified to complete their self-assessment</div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div>
+              <label style={C.lbl}>Review Period *</label>
+              <select style={C.inp} value={reviewForm.period} onChange={e=>setReviewForm(f=>({...f,period:e.target.value}))}>
+                <option value="">— Select period —</option>
+                {PERIODS.map(p=><option key={p.label} value={p.label}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={C.lbl}>Self-Assessment Due Date</label>
+              <input type="date" style={C.inp} value={reviewForm.due_date} onChange={e=>setReviewForm(f=>({...f,due_date:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={C.lbl}>Instructions for Attorneys (optional)</label>
+              <textarea style={{...C.inp,minHeight:64}} value={reviewForm.instructions} onChange={e=>setReviewForm(f=>({...f,instructions:e.target.value}))} placeholder="e.g. Please reflect honestly on your performance this half-year…"/>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:18,justifyContent:'flex-end'}}>
+            <button style={C.btn()} onClick={()=>setShowOpenReview(false)}>Cancel</button>
+            <button style={C.btn('p')} disabled={savingReview||!reviewForm.period} onClick={handleOpenReview}>{savingReview?'Opening…':'Open Review'}</button>
           </div>
         </div>
       </div>)}

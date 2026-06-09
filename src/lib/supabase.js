@@ -658,6 +658,49 @@ export async function savePaymentPlan(plan, userId) {
   return { data: data?.[0], error };
 }
 
+// ── Performance Feedback ──────────────────────────────────────────────
+export async function fetchPerformanceFeedback({ toUserId, fromUserId } = {}) {
+  let q = supabase.from('performance_feedback')
+    .select('*, sender:profiles!performance_feedback_from_user_id_fkey(full_name,role), recipient:profiles!performance_feedback_to_user_id_fkey(full_name,role)')
+    .order('created_at', { ascending: true });
+  if (toUserId)   q = q.eq('to_user_id', toUserId);
+  if (fromUserId) q = q.eq('from_user_id', fromUserId);
+  const { data, error } = await q;
+  if (error) console.error('fetchPerformanceFeedback:', error.message);
+  return { feedback: data || [] };
+}
+
+export async function savePerformanceFeedback(payload) {
+  const { data, error } = await supabase.from('performance_feedback').insert([payload]).select().single();
+  if (error) console.error('savePerformanceFeedback:', error.message);
+  return { data, error };
+}
+
+export async function markFeedbackRead(id) {
+  const { error } = await supabase.from('performance_feedback').update({ is_read: true }).eq('id', id);
+  if (error) console.error('markFeedbackRead:', error.message);
+  return { error };
+}
+
+// ── Performance Review Cycles ─────────────────────────────────────────
+export async function fetchPerformanceReviews() {
+  const { data, error } = await supabase.from('performance_reviews').select('*').order('opened_at', { ascending: false });
+  if (error) console.error('fetchPerformanceReviews:', error.message);
+  return { reviews: data || [] };
+}
+
+export async function openPerformanceReview(payload) {
+  const { data, error } = await supabase.from('performance_reviews').insert([payload]).select().single();
+  if (error) console.error('openPerformanceReview:', error.message);
+  return { data, error };
+}
+
+export async function closePerformanceReview(id) {
+  const { error } = await supabase.from('performance_reviews').update({ status:'closed', closed_at: new Date().toISOString() }).eq('id', id);
+  if (error) console.error('closePerformanceReview:', error.message);
+  return { error };
+}
+
 export async function updateInstalment(id, updates) {
   const { error } = await supabase.from('payment_plan_instalments').update(updates).eq('id', id);
   if (error) console.error('updateInstalment:', error.message);
