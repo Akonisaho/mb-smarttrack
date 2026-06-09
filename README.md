@@ -11,6 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron)](https://electronjs.org)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](#license)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Web-blue)](#)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-mb--smarttrack.vercel.app-brightgreen?logo=vercel)](https://mb-smarttrack.vercel.app)
 
 </div>
 
@@ -242,6 +243,9 @@ Run `supabase-setup.sql` in your Supabase SQL Editor to create all tables, RLS p
 
 ### 4. Run the dashboard
 
+The dashboard is deployed on **Vercel** — no local server needed to use it.
+
+For local development only:
 ```bash
 npm run dev
 # → http://localhost:3000
