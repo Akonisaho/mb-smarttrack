@@ -310,7 +310,7 @@ npm run test:report
 
 ## About
 
-Built for **Motsoeneng Bill Attorneys** — a South African law firm operating across multiple branches. Designed to replace Ghost Practice and eliminate manual time recording, spreadsheet-based trust accounting, and disconnected HR processes.
+Built for **Motsoeneng Bill** — a South African law firm operating across multiple branches. Designed to replace Ghost Practice and eliminate manual time recording, spreadsheet-based trust accounting, and disconnected HR processes.
 
 ---
 
