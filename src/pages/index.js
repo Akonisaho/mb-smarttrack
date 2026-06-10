@@ -176,7 +176,7 @@ export default function App() {
       const p = await getProfile(u.id); setProfile(p);
       if (p?.rate) setInvRate(Number(p.rate) || 150);
       if (p?.full_name) setInvAtty(p.full_name);
-      if (p?.role === 'manager' || p?.role === 'national_manager' || u.email === 'livhuwaningwn@gmail.com') { router.replace(p?.password_changed === false ? '/change-password' : '/manager'); return; }
+      if (p?.role === 'manager' || p?.role === 'national_manager') { router.replace(p?.password_changed === false ? '/change-password' : '/manager'); return; }
       if (p?.role === 'branch_manager') { router.replace(p?.password_changed === false ? '/change-password' : '/manager'); return; }
       if (p?.role === 'bookkeeper') { router.replace(p?.password_changed === false ? '/change-password' : '/bookkeeper'); return; }
       if (p?.role === 'receptionist') { router.replace(p?.password_changed === false ? '/change-password' : '/receptionist'); return; }
@@ -365,7 +365,8 @@ export default function App() {
 
   async function handleEmailInvoice(inv, customEmail) {
     setEmailingInv(inv.id);
-    const res = await fetch('/api/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: inv.id, recipientEmail: customEmail || '' }) });
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }, body: JSON.stringify({ invoiceId: inv.id, recipientEmail: customEmail || '' }) });
     const data = await res.json();
     setEmailingInv(null);
     if (!res.ok) { toast('Could not send: ' + (data.error || 'Unknown error'), 'error'); return; }

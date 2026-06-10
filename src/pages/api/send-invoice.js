@@ -7,6 +7,10 @@ const supabaseAdmin = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' });
   const { invoiceId, recipientEmail } = req.body;
   if (!invoiceId) return res.status(400).json({ error: 'Invoice ID required' });
 

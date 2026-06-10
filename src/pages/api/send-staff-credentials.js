@@ -7,6 +7,13 @@ const supabaseAdmin = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' });
+  const { data: callerProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single();
+  const managerRoles = ['manager', 'national_manager', 'branch_manager'];
+  if (!managerRoles.includes(callerProfile?.role)) return res.status(403).json({ error: 'Forbidden' });
   const { fullName, email, role, tempPassword, branchName } = req.body;
   if (!email || !tempPassword) return res.status(400).json({ error: 'Missing fields' });
 

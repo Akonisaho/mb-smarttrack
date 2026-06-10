@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { C } from '../../lib/styles';
 import { fmtR, fmtDate } from '../../lib/format';
-import { saveInvoicePayment, writeOffInvoice, undoWriteOff } from '../../lib/supabase';
+import { supabase, saveInvoicePayment, writeOffInvoice, undoWriteOff } from '../../lib/supabase';
 
 export default function DebtorsTab({
   invoices, invoicePayments, isMobile, showAlert, load, profile, todayStr,
@@ -36,7 +36,8 @@ export default function DebtorsTab({
 
   const handleEmailInvoice = async (inv, customEmail) => {
     setEmailingInv(inv.id);
-    const res = await fetch('/api/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: inv.id, recipientEmail: customEmail || '' }) });
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/send-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }, body: JSON.stringify({ invoiceId: inv.id, recipientEmail: customEmail || '' }) });
     const data = await res.json();
     setEmailingInv(null);
     if (!res.ok) { showAlert('Could not send: ' + (data.error || 'Unknown error'), 'error'); return; }

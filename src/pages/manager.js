@@ -128,7 +128,7 @@ export default function Manager() {
     supabase.auth.getSession().then(async({data})=>{
       if(!data.session){ router.replace('/login'); return; }
       const p = await getProfile(data.session.user.id);
-      const isManager = p?.role==='manager'||p?.role==='national_manager'||p?.role==='branch_manager'||data.session.user.email==='livhuwaningwn@gmail.com';
+      const isManager = p?.role==='manager'||p?.role==='national_manager'||p?.role==='branch_manager';
       if(!isManager){ router.replace('/'); return; }
       setProfile(p||{full_name:data.session.user.email,role:'manager'});
       setLoading(false);
@@ -262,7 +262,7 @@ export default function Manager() {
 
   function showAlert(msg,type='success'){ setTrustAlert({msg,type}); setTimeout(()=>setTrustAlert({msg:'',type:''}),60000); }
   async function handleSaveCreditNote(){ if(!cnForm.amount||!cnForm.reason.trim()||!cnInvoice) return; setSavingCN(true); const{error}=await saveCreditNote({invoiceId:cnInvoice.id,client:cnInvoice.client,matterId:cnInvoice.matter_id,amount:cnForm.amount,reason:cnForm.reason},profile?.id); setSavingCN(false); if(error){showAlert('Error: '+error.message,'error');return;} const{creditNotes:cn}=await fetchCreditNotes(null); setCreditNotes(cn); setShowCNForm(false);setCnInvoice(null);setCnForm({amount:'',reason:''});showAlert('✓ Credit note issued.'); await logAudit('credit_note_issued','invoice',cnInvoice.id,{amount:cnForm.amount,reason:cnForm.reason},profile?.id); }
-  async function handleEmailInvoice(inv,customEmail){ setEmailingInv(inv.id); const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})}); const data=await res.json(); setEmailingInv(null); if(!res.ok){showAlert('Could not send: '+(data.error||'Unknown error'),'error');return;} showAlert(data.warning||`✓ Invoice emailed to ${data.sentTo}`); await logAudit('invoice_emailed','invoice',inv.id,{sentTo:customEmail},profile?.id); }
+  async function handleEmailInvoice(inv,customEmail){ setEmailingInv(inv.id); const{data:{session}}=await supabase.auth.getSession(); const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token}`},body:JSON.stringify({invoiceId:inv.id,recipientEmail:customEmail||''})}); const data=await res.json(); setEmailingInv(null); if(!res.ok){showAlert('Could not send: '+(data.error||'Unknown error'),'error');return;} showAlert(data.warning||`✓ Invoice emailed to ${data.sentTo}`); await logAudit('invoice_emailed','invoice',inv.id,{sentTo:customEmail},profile?.id); }
 
   async function loadMgrNotes(matterId){ const{notes}=await fetchMatterNotes(matterId); setMgrNotesMap(m=>({...m,[matterId]:notes})); }
   async function handleSaveMgrNote(matterId){ if(!mgrNoteText.trim()) return; setSavingMgrNote(true); const{data,error}=await saveMatterNote({matterId,note:mgrNoteText.trim(),noteType:mgrNoteType},profile?.id); setSavingMgrNote(false); if(error) return; setMgrNoteText(''); setMgrNotesMap(m=>({...m,[matterId]:[data,...(m[matterId]||[])]})); }
@@ -276,7 +276,7 @@ export default function Manager() {
   async function sendSatisfactionRequest(matter){ const res=await fetch('/api/send-satisfaction-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matterId:matter.id,clientId:matter.client_id||null,attorneyId:matter.user_id,appUrl})}); const data=await res.json(); if(!res.ok){showAlert('Could not send: '+(data.error||'No client email'),'error');return;} showAlert(`✓ Satisfaction survey sent to client.`); }
   async function updateFicaRisk(clientId,rating){ await supabase.from('clients').update({risk_rating:rating}).eq('id',clientId); showAlert('✓ Risk rating updated.'); load(); }
 
-  async function sendOverdueReminders(){ const now=new Date(); const overdue=invoices.filter(inv=>{ const age=Math.floor((now-new Date(inv.created_at||0))/86400000); const paid=invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0); return age>30&&Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid)>0&&!inv.written_off; }); if(!overdue.length){showAlert('No overdue invoices to remind.','error');return;} let sent=0; for(const inv of overdue){ const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({invoiceId:inv.id,type:'reminder'})}); if(res.ok) sent++; } showAlert(`✓ Sent ${sent} overdue reminders.`); }
+  async function sendOverdueReminders(){ const now=new Date(); const overdue=invoices.filter(inv=>{ const age=Math.floor((now-new Date(inv.created_at||0))/86400000); const paid=invoicePayments.filter(p=>p.invoice_id===inv.id).reduce((s,p)=>s+Number(p.amount),0); return age>30&&Math.max(0,(inv.total_units||0)*(inv.rate||150)*1.15-paid)>0&&!inv.written_off; }); if(!overdue.length){showAlert('No overdue invoices to remind.','error');return;} const{data:{session}}=await supabase.auth.getSession(); let sent=0; for(const inv of overdue){ const res=await fetch('/api/send-invoice',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token}`},body:JSON.stringify({invoiceId:inv.id,type:'reminder'})}); if(res.ok) sent++; } showAlert(`✓ Sent ${sent} overdue reminders.`); }
   async function approvePayment(id){ const {error}=await supabase.from('trust_transactions').update({status:'posted',approved_by:profile?.id,approved_at:new Date().toISOString()}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Payment approved and posted.','success'); load(); }
   async function rejectPayment(id,reason){ const {error}=await supabase.from('trust_transactions').update({status:'rejected',rejection_reason:reason||'Rejected by manager'}).eq('id',id); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('Payment rejected.','success'); load(); }
   async function assignBranch(userId,branchId){ const {error}=await supabase.from('profiles').update({branch_id:branchId}).eq('id',userId); if(error){showAlert('Error: '+error.message,'error');return;} showAlert('✓ Branch updated.','success'); load(); }
@@ -287,14 +287,16 @@ export default function Manager() {
     if(!inviteForm.fullName||!inviteForm.email||!inviteForm.branchId){ setInviteMsg({msg:'Please fill in all fields.',type:'error'}); return; }
     setInviting(true);
     setInviteMsg({msg:'',type:''});
-    const res = await fetch('/api/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...inviteForm,inviterRole:profile?.role})});
+    const { data: { session } } = await supabase.auth.getSession();
+    const authHeader = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` };
+    const res = await fetch('/api/invite',{method:'POST',headers:authHeader,body:JSON.stringify({...inviteForm,inviterRole:profile?.role})});
     const result = await res.json();
     if(!res.ok){ setInviteMsg({msg:'Error: '+(result.error||'Failed'),type:'error'}); setInviting(false); return; }
     const branchName=branches.find(b=>b.id===inviteForm.branchId)?.name||'the firm';
     const tempPassword=result.tempPassword||'';
     // Auto-send credentials email
     if(tempPassword){
-      await fetch('/api/send-staff-credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fullName:inviteForm.fullName,email:inviteForm.email,role:inviteForm.role,tempPassword,branchName})});
+      await fetch('/api/send-staff-credentials',{method:'POST',headers:authHeader,body:JSON.stringify({fullName:inviteForm.fullName,email:inviteForm.email,role:inviteForm.role,tempPassword,branchName})});
     }
     showAlert(`✓ ${inviteForm.fullName} added to ${branchName}. Login details emailed to ${inviteForm.email}. Temporary password: ${tempPassword} — shown here as backup.`,'success');
     setInviting(false);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../lib/styles';
+import { supabase } from '../../lib/supabase';
 
 export default function CampaignsTab({ matters, clients, isMobile, showAlert }) {
   const [subject, setSubject] = useState('');
@@ -12,7 +13,8 @@ export default function CampaignsTab({ matters, clients, isMobile, showAlert }) 
   const send = async () => {
     if (!subject.trim() || !body.trim()) { showAlert('Subject and body are required.', 'error'); return; }
     setSending(true); setResult(null);
-    const r = await fetch('/api/send-campaign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject, body, recipientType: recip, matterId: matter }) });
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await fetch('/api/send-campaign', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` }, body: JSON.stringify({ subject, body, recipientType: recip, matterId: matter }) });
     const d = await r.json();
     setSending(false); setResult(d);
     if (r.ok) showAlert(d.message || `✓ Sent to ${d.sent} client(s).`);
