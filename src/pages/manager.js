@@ -133,9 +133,15 @@ export default function Manager() {
       setProfile(p||{full_name:data.session.user.email,role:'manager'});
       setLoading(false);
     });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event)=>{
+      if(event==='SIGNED_OUT') router.replace('/login');
+    });
+    return()=>subscription.unsubscribe();
   },[]);
 
   const load = useCallback(async()=>{
+    const { data: { session: s } } = await supabase.auth.getSession();
+    if (!s) { router.replace('/login'); return; }
     const [sumRes,profRes,invRes,branchRes,trustRes,matRes,payRes,cliRes,ficaRes,disbRes,schedRes] = await Promise.all([
       fetchManagerSummary(selDate),
       fetchAllProfiles(),

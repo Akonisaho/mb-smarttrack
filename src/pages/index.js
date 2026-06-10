@@ -184,6 +184,10 @@ export default function App() {
       if (p?.password_changed === false) { router.replace('/change-password'); return; }
       setAuthLoading(false);
     });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') router.replace('/login');
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // ── Performance feedback ──────────────────────────────────────────
@@ -226,6 +230,8 @@ export default function App() {
     if (authLoading || !userId) return;
     let cancelled = false;
     const doLoad = async () => {
+      const { data: { session: s } } = await supabase.auth.getSession();
+      if (!s) { router.replace('/login'); return; }
       const [liveRes, allRes, invRes, matRes] = await Promise.all([fetchActivities({ date: selDate, userId }), fetchAllActivities({ userId }), fetchInvoices(userId), fetchMatters(userId)]);
       if (cancelled) return;
       setOnline(true);
@@ -258,6 +264,8 @@ export default function App() {
   // ── Trust data load ───────────────────────────────────────────────
   const loadTrust = useCallback(async () => {
     if (!userId) return;
+    const { data: { session: s } } = await supabase.auth.getSession();
+    if (!s) { router.replace('/login'); return; }
     setTrustLoading(true);
     try {
       const [accsRes, txnsRes, branchRes, locksRes, alertsRes] = await Promise.all([
