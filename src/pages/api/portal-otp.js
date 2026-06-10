@@ -32,6 +32,18 @@ export default async function handler(req, res) {
 
   // SEND OTP
   const clientEmail = email.toLowerCase().trim();
+
+  // Rate limit: max 5 requests per email per hour
+  const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabaseAdmin
+    .from('portal_otps')
+    .select('*', { count: 'exact', head: true })
+    .eq('email', clientEmail)
+    .gte('created_at', windowStart);
+  if (count >= 5) {
+    return res.status(429).json({ error: 'Too many requests. Please wait before requesting another code.' });
+  }
+
   const { data: client } = await supabaseAdmin
     .from('clients').select('id,full_name').eq('email', clientEmail).eq('is_active', true).maybeSingle();
   if (!client) return res.status(404).json({ error: 'No account found for this email address. Please contact the firm.' });
