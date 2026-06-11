@@ -1,0 +1,62 @@
+{
+  "name": "mb-smarttrack-agent",
+  "version": "1.0.0",
+  "description": "MB SmartTrack - Automated Legal Time Tracking",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "active-win": "^8.1.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.9",
+    "node-fetch": "^2.7.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "co.za.motsoenengbill.smarttrack",
+    "productName": "MB SmartTrack",
+    "copyright": "Motsoeneng Bill Attorneys",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MB SmartTrack",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
+    },
+    "files": [
+      "main.js",
+      "tracker.js",
+      "supabase.js",
+      "package.json",
+      "icon.png",
+      "icon.ico",
+      "node_modules/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Akonisaho",
+      "repo": "mb-smarttrack"
+    }
+  },
+  "author": "Motsoeneng Bill "
+}
